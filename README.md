@@ -1,8 +1,8 @@
 # Trail Simulation
 
-A single-page web application for drawing routes on an OpenStreetMap map and simulating movement along them with scheduled stops, speed changes, and time tracking.
+A single-page web application for drawing routes on a map and simulating movement along them with scheduled stops, speed changes, and time tracking.
 
-Built with [Leaflet](https://leafletjs.com) and OpenStreetMap tiles.
+Built with [Leaflet](https://leafletjs.com) and OpenStreetMap / OpenTopoMap tiles.
 
 ## Features
 
@@ -55,9 +55,9 @@ The sidebar header contains controls always visible regardless of the active tab
 ### Route tab
 
 1. Click the map to add waypoints (Route points mode, active by default)
-2. Switch to **Stops** mode — inline fields appear for label (default `Stopover N`) and duration in `MM:SS` format (default `02:00`), then click on the route to place a stop
-3. Switch to **Speed** mode — inline fields appear for label (default `Speed change N`) and speed in km/h (default `1.7`), then click on the route to place a speed point
-4. Switch to **Custom** mode — enter a label and click anywhere on the map to place a purple marker (not snapped to route, not tracked during animation)
+2. Switch to **Stop points** mode — inline fields appear for label (default `Stopover N`) and duration in `MM:SS` format (default `02:00`), then click on the route to place a stop
+3. Switch to **Speed points** mode — inline fields appear for label (default `Speed change N`) and speed in km/h (default `1.7`), then click on the route to place a speed point
+4. Switch to **Custom points** mode — enter a label and click anywhere on the map to place a purple marker (not snapped to route, not tracked during animation)
 5. Use **Clear route**, **Fit map**, **Undo point** to manage the route
 6. Enter a name and click **Save** to persist the route (includes all stops, speed points, and custom points); click a name in the list below to load, click `×` to delete
 

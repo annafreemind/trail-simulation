@@ -22,9 +22,9 @@
         <!-- Sidebar -->
         <div id="sidebar">
             <div id="sidebar-resizer"></div>
-            <h1>
-                Trail Simulation
-                <small>draw route · animate movement</small>
+            <h1 style="display:flex;align-items:center;justify-content:space-between">
+                <span>Trail Simulation<small>draw route · animate movement</small></span>
+                <button id="btnHelp" title="Help" style="width:26px;height:26px;background:transparent;border:1px solid #2a3a5e;border-radius:50%;color:#8899bb;font-size:14px;font-weight:700;cursor:pointer;flex-shrink:0;line-height:1">?</button>
             </h1>
 
             <div style="display:flex;gap:4px;align-items:center;margin-bottom:6px">
@@ -187,6 +187,17 @@
         <div id="alarm" style="display:none;position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:10000;background:#5c1a1a;border:2px solid #e74c3c;border-radius:8px;padding:12px 24px;text-align:center;font-size:18px;font-weight:700;color:#ff6b6b;box-shadow:0 4px 20px rgba(0,0,0,.5);transition:opacity 1s ease">First 112 call</div>
     </div>
 
+    <div id="helpModal" class="modal-overlay" style="display:none">
+      <div class="modal-box">
+        <div class="modal-head">
+          <span>Trail Simulation — Help</span>
+          <button id="helpClose" class="modal-close">&times;</button>
+        </div>
+        <div id="helpContent" class="modal-body">Loading...</div>
+      </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="sun_data.js"></script>
     <script src="sky_colors.js"></script>
     <script src="app.js"></script>

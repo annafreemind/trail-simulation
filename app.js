@@ -1437,6 +1437,12 @@ document.getElementById('btnExport').addEventListener('click', () => {
 });
 
 document.getElementById('btnImport').addEventListener('click', () => {
+    const saved = getSavedRoutes();
+    if (saved && Object.keys(saved).length > 0) {
+        if (!confirm('Existing routes will be replaced. Export them first to keep a backup.\n\nContinue with import?')) {
+            return;
+        }
+    }
     document.getElementById('importFile').click();
 });
 
@@ -1467,4 +1473,27 @@ document.getElementById('importFile').addEventListener('change', function (e) {
     };
     reader.readAsText(file);
     this.value = '';
+});
+
+// ============================================================
+//   Help modal
+// ============================================================
+document.getElementById('btnHelp').addEventListener('click', async () => {
+    const modal = document.getElementById('helpModal');
+    const content = document.getElementById('helpContent');
+    content.innerHTML = 'Loading...';
+    modal.style.display = 'flex';
+    try {
+        const res = await fetch('README.md');
+        const md = await res.text();
+        content.innerHTML = marked.parse(md);
+    } catch (err) {
+        content.innerHTML = '<p>Failed to load help.</p>';
+    }
+});
+document.getElementById('helpClose').addEventListener('click', () => {
+    document.getElementById('helpModal').style.display = 'none';
+});
+document.getElementById('helpModal').addEventListener('click', function (e) {
+    if (e.target === this) this.style.display = 'none';
 });
