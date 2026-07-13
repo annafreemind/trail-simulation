@@ -15,7 +15,7 @@ Built with [Leaflet](https://leafletjs.com) and OpenStreetMap / OpenTopoMap tile
 - **Point labels** — toggle permanent labels on stop, speed change, and custom point markers from the sidebar
 - **Map layers** — switch between OpenStreetMap and OpenTopoMap (shows elevation contours); preference saved to localStorage
 - **POI markers** — predefined points of interest (Kris shorts, Backpack) displayed as transparent circles with red outlines and permanent labels
-- **Sun position widget** — a schematic in the bottom-right corner shows the sky horizon with a north-up compass (N/E/S/W labels, yellow heading arrow, sun icon with rays at absolute azimuth), elevation scale (30°–90° on the left edge), mountain silhouette, and current time. Sky color transitions from blue → golden → purple → dark using the Hosek-Wilkie sky model via the `skylight` library, with directional dimming (sky appears darker when the sun is behind you, normal when ahead). Heading direction auto-detected from route bearing, smoothed for continuous transitions. Hideable via the toggle button.
+- **Sun position widget** — a schematic in the bottom-right corner shows the sky horizon with a north-up compass (N/E/S/W labels, yellow heading arrow, sun icon with rays at absolute azimuth), elevation scale (30°–90° on the left edge), mountain silhouette, and current time. Sky color transitions from blue → golden → purple → dark using the Hosek-Wilkie sky model via the `skylight` library, Heading direction auto-detected from route bearing, smoothed for continuous transitions. Hideable via the toggle button.
 - **Reverse direction** — toggle direction mid-animation, recalculates position and bearing
 - **Follow mode** — automatically pan the map with the marker during animation
 - **112 alarm** — two calls at 16:39 and 16:51 with red markers placed on the route. Alarm banner fades out after 10 seconds. Timer continues running, marker keeps moving. Alarms only trigger when the simulation time crosses the call time — no markers or notifications if starting after 16:51
@@ -75,7 +75,7 @@ The sidebar header contains controls always visible regardless of the active tab
 
 The widget renders the sky from a first-person perspective — the view shows the landscape in the direction of travel. Features:
 
-- **Sky colors** — computed with the Hosek-Wilkie model (via the `skylight` Python library) at Boquete coordinates, stored in `sky_colors.js`. Cross-faded by sun elevation. Directional dimming adjusts brightness based on sun position relative to viewing direction (stronger effect near sunrise/sunset, negligible at noon).
+- **Sky colors** — computed with the Hosek-Wilkie model (via the `skylight` Python library) at Boquete coordinates, stored in `sky_colors.js`. Cross-faded by sun elevation. 
 - **Elevation scale** — vertical scale on the left edge with marks at 30°, 60°, and 90° (zenith), white with dark shadow for readability at any time of day. A yellow triangle indicates the current sun elevation.
 - **Compass** — north-up circle with N/E/S/W labels, a yellow arrow from center showing heading direction, and a sun icon (gradient body with 8 rays) at the sun's absolute azimuth.
 - **Mountain silhouette** — schematic mountain at ~1500 m distance, centered on the horizon.
