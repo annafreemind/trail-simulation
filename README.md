@@ -1,0 +1,61 @@
+# Trail Simulation
+
+A single-page web application for drawing routes on an OpenStreetMap map and simulating movement along them with scheduled stops, speed changes, and time tracking.
+
+Built with [Leaflet](https://leafletjs.com) and OpenStreetMap tiles.
+
+## Features
+
+- **Route building** — click on the map to add waypoints; undo, clear, and fit the map to the route
+- **Animation** — move a marker along the route with configurable speed and time acceleration (1×–150×)
+- **Scheduled stops** — place stop points on the route with a duration in MM:SS format; the marker pauses automatically when it arrives. Default label `Stopover N`, default duration `02:00`. Orange markers indicate stops; passed stops turn semi-transparent
+- **Speed change points** — place speed points on the route; the speed changes when the marker reaches the point. Default label `Speed change N`, default speed 1.7 km/h. Green markers indicate speed points
+- **Reverse direction** — toggle direction mid-animation
+- **Follow mode** — automatically pan the map with the marker during animation
+- **112 alarm** — configurable notification that triggers at 16:39; timer continues running, marker stops
+- **Save / Load routes** — persist routes (including waypoints, stops, and speed points) to `localStorage` by name. Routes are stored under the key `trail_routes` and are tied to the domain — clearing browser data or switching domains will remove them. Inspect via `JSON.parse(localStorage.getItem('trail_routes'))` in the browser console.
+- **Tabbed UI** — separate Route and Navigation panels
+- **Resizable sidebar** — drag the right edge to resize (240–600 px)
+- **Passed point tracking** — visited stops and activated speed points are marked with a green checkmark and strikethrough; the Navigation tab shows start and end times for completed stops and all points in a single combined scrollable list
+- **Route-ordered lists** — stops and speed points are sorted by their position along the route, matching the order of traversal
+
+## How to run
+
+1. Make sure **Python 3** is installed:
+   - **macOS**: `brew install python3` (install Homebrew from https://brew.sh first if needed)
+   - **Ubuntu/Debian**: `sudo apt install python3`
+   - **Fedora**: `sudo dnf install python3`
+   - **Windows**: Download from https://python.org and check "Add Python to PATH" during installation
+
+2. Open a terminal in this directory and run:
+
+   ```bash
+   python3 -m http.server 8000
+   ```
+
+3. Open [http://localhost:8000](http://localhost:8000) in a browser.
+
+> Alternatively, use any other static server: `npx http-server`, VS Code Live Server, etc. Opening the HTML file directly (`file://`) may break some Leaflet features.
+
+## Usage
+
+### Route tab
+
+1. Click the map to add waypoints (Route points mode, active by default)
+2. Switch to **Stops** mode — inline fields appear for label (default `Stopover N`) and duration in `MM:SS` format (default `02:00`), then click on the route to place a stop
+3. Switch to **Speed** mode — inline fields appear for label (default `Speed change N`) and speed in km/h (default `1.7`), then click on the route to place a speed point
+4. Use **Clear route**, **Fit map**, **Undo point** to manage the route
+5. Enter a name and click **Save** to persist the route (includes all stops and speed points); use the dropdown and **Load** to restore
+
+### Navigation tab
+
+1. Set the start time, speed (km/h), and time acceleration (1×–150×)
+2. Click **Start** to begin animation
+3. Use **Pause** / **Stop** to control movement
+4. **Reverse direction** flips the route mid-animation
+5. The lists at the bottom show all scheduled stops and speed points in a single scrollable list sorted by route position, with real-time status: unvisited points show their duration/speed, passed stops show their start and end times
+
+## Requirements
+
+- A modern web browser (Chrome, Firefox, Safari, Edge)
+- Internet connection (for Leaflet CDN and map tiles)
