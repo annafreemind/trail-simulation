@@ -105,6 +105,7 @@ document.getElementById('mapLayer').addEventListener('change', function() {
     if (waypoints.length >= 2) {
         map.fitBounds(L.latLngBounds(waypoints), { padding: [50, 50] });
     }
+    localStorage.setItem('trail_settings', JSON.stringify({ mapLayer: this.value }));
 });
 
 L.marker([8.842428, -82.425013], {
@@ -1078,31 +1079,24 @@ if (elSpeedUnit.value === 'mph') {
     document.getElementById('speedValue').value = '1.0';
 }
 
+// Restore map layer preference
+try {
+    const saved = JSON.parse(localStorage.getItem('trail_settings'));
+    if (saved && saved.mapLayer) {
+        document.getElementById('mapLayer').value = saved.mapLayer;
+        document.getElementById('mapLayer').dispatchEvent(new Event('change'));
+    }
+} catch {}
+
 console.log('Trail Animator ready — click the map to start!');
 
 // ============================================================
-//   Sun view — trail photo lighting simulation
-//   Pre-graded keyframes (make_keyframes.py) cross-faded by sun elevation.
-//   Photo taken at 13:20 (sun elevation ~78°) — reference brightness.
+//   Sun view — horizon schematic with sun position
+//   Sun data: Boquete, Panama, April 1 2014 (sun_data.js)
 // ============================================================
 const sunCanvas = document.getElementById('sunView');
 const sunCtx = sunCanvas.getContext('2d');
 let lastSunBucket = -1;
-
-const sunKeyframes = [
-    { elev: -14, src: 'images/kf_night.jpg' },
-    { elev: -8, src: 'images/kf_dusk.jpg' },
-    { elev: -4, src: 'images/kf_civil.jpg' },
-    { elev: 0, src: 'images/kf_sunset.jpg' },
-    { elev: 8, src: 'images/kf_golden.jpg' },
-    { elev: 20, src: 'images/kf_low.jpg' },
-    { elev: 50, src: 'images/kf_day.jpg' },
-];
-sunKeyframes.forEach(kf => {
-    kf.img = new Image();
-    kf.img.src = kf.src;
-    kf.img.onload = refreshSunView;
-});
 
 function getSunAt(date) {
     const idx = date.getHours() * 12 + Math.floor(date.getMinutes() / 5);
@@ -1110,58 +1104,49 @@ function getSunAt(date) {
     return row ? { elev: row[2], azim: row[3] } : null;
 }
 
-function drawKeyframe(img, alpha) {
-    if (!img.complete || !img.naturalWidth) return;
-    const W = sunCanvas.width, H = sunCanvas.height;
-    const scale = Math.max(W / img.naturalWidth, H / img.naturalHeight);
-    const dw = img.naturalWidth * scale;
-    const dh = img.naturalHeight * scale;
-    sunCtx.globalAlpha = alpha;
-    sunCtx.drawImage(img, (W - dw) / 2, (H - dh) / 2, dw, dh);
-    sunCtx.globalAlpha = 1;
+function lerpColor(a, b, t) {
+    return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+}
+function rgb(c) {
+    return `rgb(${Math.round(c[0])},${Math.round(c[1])},${Math.round(c[2])})`;
 }
 
 function drawSunView(date) {
     const sun = getSunAt(date);
     if (!sun) return;
     const W = sunCanvas.width, H = sunCanvas.height;
-    const kfs = sunKeyframes;
-    const elev = Math.max(kfs[0].elev, Math.min(kfs[kfs.length - 1].elev, sun.elev));
+    const elev = Math.max(-12, Math.min(50, sun.elev));
+    const sx = 0, sw = W, sh = H;
+    const cx = W / 2;
+    const horizonY = sh * 0.58;
+    const arcR = sh * 0.42;
+    const azimLeft = 80, azimRight = 280;
 
-    // interpolate keyframes
-    let i = 0;
-    while (i < kfs.length - 2 && elev > kfs[i + 1].elev) i++;
-    const a = kfs[i], b = kfs[i + 1];
-    const t = Math.max(0, Math.min(1, (elev - a.elev) / (b.elev - a.elev)));
+    // sky colors — lookup from Hosek-Wilkie table, interpolate
+    const table = skyColorTable;
+    let idx = 0;
+    while (idx < table.length - 2 && elev > table[idx + 1].e) idx++;
+    const a = table[idx], b = table[idx + 1];
+    const tblT = Math.max(0, Math.min(1, (elev - a.e) / (b.e - a.e)));
+    const skyTop = [a.t[0] + (b.t[0] - a.t[0]) * tblT, a.t[1] + (b.t[1] - a.t[1]) * tblT, a.t[2] + (b.t[2] - a.t[2]) * tblT];
+    const skyHor = [a.h[0] + (b.h[0] - a.h[0]) * tblT, a.h[1] + (b.h[1] - a.h[1]) * tblT, a.h[2] + (b.h[2] - a.h[2]) * tblT];
+    // apply brightness envelope
+    const br = Math.max(0.05, (elev + 12) / 62);
+    const bTop = [skyTop[0] * br, skyTop[1] * br, skyTop[2] * br];
+    const bHor = [skyHor[0] * br, skyHor[1] * br, skyHor[2] * br];
 
     sunCtx.clearRect(0, 0, W, H);
 
-    // photo on left 62%
-    const photoW = Math.floor(W * 0.62);
-    sunCtx.save();
-    sunCtx.beginPath();
-    sunCtx.rect(0, 0, photoW, H);
-    sunCtx.clip();
-    drawKeyframe(a.img, 1);
-    if (t > 0) drawKeyframe(b.img, t);
-    sunCtx.restore();
+    // gradient sky
+    const grad = sunCtx.createLinearGradient(0, 0, 0, horizonY);
+    grad.addColorStop(0, rgb(bTop));
+    grad.addColorStop(1, rgb(bHor));
+    sunCtx.fillStyle = grad;
+    sunCtx.fillRect(0, 0, W, horizonY);
 
-    // ---- schematic on right 38% ----
-    const sx = photoW;
-    const sw = W - sx;
-    const sh = H;
-    const cx = sx + sw / 2;          // center x
-    const horizonY = sh * 0.58;       // horizon y
-    const arcR = sh * 0.42;           // sky radius (90° = top)
-    const azimLeft = 80, azimRight = 280;
-
-    // background
-    sunCtx.fillStyle = 'rgba(10,18,35,0.82)';
-    sunCtx.fillRect(sx, 0, sw, sh);
-
-    // ground fill
+    // ground
     sunCtx.fillStyle = 'rgba(40,55,40,0.5)';
-    sunCtx.fillRect(sx, horizonY, sw, sh - horizonY);
+    sunCtx.fillRect(0, horizonY, W, sh - horizonY);
 
     // elevation arcs
     sunCtx.strokeStyle = 'rgba(255,255,255,0.15)';
@@ -1188,7 +1173,7 @@ function drawSunView(date) {
     // mountain silhouette (1500m away, assumed ~300m rise → ~12°)
     const mtnWidth = sw * 0.38;
     const mtnHeight = arcR * 0.22; // ~12°
-    const mtnX = cx - mtnWidth / 2 + sw * 0.08;
+    const mtnX = cx;
     sunCtx.fillStyle = 'rgba(60,75,60,0.85)';
     sunCtx.beginPath();
     sunCtx.moveTo(mtnX - mtnWidth / 2, horizonY);
@@ -1295,6 +1280,7 @@ function refreshSunView() {
 }
 
 elStartTime.addEventListener('input', refreshSunView);
+refreshSunView();
 
 // Toggle sun widget
 document.getElementById('sunViewToggle').addEventListener('click', function () {
