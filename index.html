@@ -58,9 +58,9 @@
 
                 <div style="display:flex;gap:4px;font-size:12px">
                     <button class="mode-btn active" data-mode="waypoint" style="flex:1;padding:5px 0;border:1px solid #2a3a5e;border-radius:4px;background:transparent;color:#8899bb;cursor:pointer;font-weight:600;transition:all .2s">Route points</button>
-                    <button class="mode-btn" data-mode="stop" style="flex:1;padding:5px 0;border:1px solid #2a3a5e;border-radius:4px;background:transparent;color:#f39c12;cursor:pointer;font-weight:600;transition:all .2s">Stops</button>
-                    <button class="mode-btn" data-mode="speed" style="flex:1;padding:5px 0;border:1px solid #2a3a5e;border-radius:4px;background:transparent;color:#2ecc71;cursor:pointer;font-weight:600;transition:all .2s">Speed</button>
-                    <button class="mode-btn" data-mode="custom" style="flex:1;padding:5px 0;border:1px solid #2a3a5e;border-radius:4px;background:transparent;color:#9b59b6;cursor:pointer;font-weight:600;transition:all .2s">Custom</button>
+                    <button class="mode-btn" data-mode="stop" style="flex:1;padding:5px 0;border:1px solid #2a3a5e;border-radius:4px;background:transparent;color:#f39c12;cursor:pointer;font-weight:600;transition:all .2s">Stop points</button>
+                    <button class="mode-btn" data-mode="speed" style="flex:1;padding:5px 0;border:1px solid #2a3a5e;border-radius:4px;background:transparent;color:#2ecc71;cursor:pointer;font-weight:600;transition:all .2s">Speed points</button>
+                    <button class="mode-btn" data-mode="custom" style="flex:1;padding:5px 0;border:1px solid #2a3a5e;border-radius:4px;background:transparent;color:#9b59b6;cursor:pointer;font-weight:600;transition:all .2s">Custom points</button>
                 </div>
 
                 <div id="stopInputs" style="display:none;margin:4px 0;padding:4px;background:#0a1528;border-radius:4px">
@@ -177,8 +177,13 @@
 
         <!-- Map -->
         <div id="map"></div>
-        <canvas id="sunView" width="400" height="300"></canvas>
-        <div id="sunViewToggle" title="Toggle trail preview">−</div>
+        <div class="sun-controls">
+           <canvas id="sunView" width="400" height="300"></canvas>
+           <div class="sun-caption">
+             <span class="sun-info" id="sunInfo"></span>
+             <div id="sunViewToggle" title="Toggle panel">▼</div>
+           </div>
+         </div>
         <div id="alarm" style="display:none;position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:10000;background:#5c1a1a;border:2px solid #e74c3c;border-radius:8px;padding:12px 24px;text-align:center;font-size:18px;font-weight:700;color:#ff6b6b;box-shadow:0 4px 20px rgba(0,0,0,.5);transition:opacity 1s ease">First 112 call</div>
     </div>
 

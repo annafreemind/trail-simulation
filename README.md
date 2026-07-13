@@ -13,14 +13,14 @@ Built with [Leaflet](https://leafletjs.com) and OpenStreetMap tiles.
 - **Custom points** — place purple markers anywhere on the map with a custom label to mark locations you consider important
 - **Speed units** — switch between km/h and mph; distance display and all speed labels convert automatically
 - **Point labels** — toggle permanent labels on stop, speed change, and custom point markers from the sidebar
-- **Map layers** — switch between OpenStreetMap and OpenTopoMap (shows elevation contours)
+- **Map layers** — switch between OpenStreetMap and OpenTopoMap (shows elevation contours); preference saved to localStorage
 - **POI markers** — predefined points of interest (Kris shorts, Backpack) displayed as transparent circles with red outlines and permanent labels
-- **Sun position widget** — a schematic in the bottom-right corner shows the sky horizon with the sun at its current elevation/azimuth, a mountain silhouette at 1500 m, elevation arcs (30°, 60°), and the current time. Sky color transitions from blue → golden → purple → dark as the sun sets, using data from `sun_data.js` (Boquete, Panama, April 1, 5‑minute intervals). Hideable via the toggle button.
-- **Reverse direction** — toggle direction mid-animation
+- **Sun position widget** — a schematic in the bottom-right corner shows the sky horizon with a north-up compass (N/E/S/W labels, yellow heading arrow, sun icon with rays at absolute azimuth), elevation scale (30°–90° on the left edge), mountain silhouette, and current time. Sky color transitions from blue → golden → purple → dark using the Hosek-Wilkie sky model via the `skylight` library, with directional dimming (sky appears darker when the sun is behind you, normal when ahead). Heading direction auto-detected from route bearing, smoothed for continuous transitions. Hideable via the toggle button.
+- **Reverse direction** — toggle direction mid-animation, recalculates position and bearing
 - **Follow mode** — automatically pan the map with the marker during animation
-- **112 alarm** — configurable notification that triggers at 16:39; timer continues running, marker stops
-- **Save / Load routes** — persist routes (including waypoints, stops, speed points, and custom points) to `localStorage` by name. The route list appears as items below the input — click a name to load, click `×` to delete. Routes are stored under the key `trail_routes` and are tied to the domain — clearing browser data or switching domains will remove them. Inspect via `JSON.parse(localStorage.getItem('trail_routes'))` in the browser console.
-- **Export / Import** — download all routes plus settings (unit, map layer, toggles) as a `.json` file and load it on another machine to restore everything
+- **112 alarm** — two calls at 16:39 and 16:44 with red markers placed on the route. Alarm banner fades out after 10 seconds. Timer continues running, marker keeps moving. Alarms only trigger when the simulation time crosses the call time — no markers or notifications if starting after 16:44
+- **Save / Load routes** — persist routes (including waypoints, stops, speed points, and custom points) to `localStorage` by name. The route list appears as items below the input — click a name to load, click `×` to delete. Routes are stored under the key `trail_routes`
+- **Export / Import** — download all routes plus settings as a `.json` file and load it on another machine to restore everything
 - **Tabbed UI** — separate Route and Navigation panels
 - **Resizable sidebar** — drag the right edge to resize (240–600 px)
 - **Passed point tracking** — visited stops and activated speed points are marked with a green checkmark and strikethrough; the Navigation tab shows start and end times for completed stops and all points in a single combined scrollable list
@@ -59,21 +59,39 @@ The sidebar header contains controls always visible regardless of the active tab
 3. Switch to **Speed** mode — inline fields appear for label (default `Speed change N`) and speed in km/h (default `1.7`), then click on the route to place a speed point
 4. Switch to **Custom** mode — enter a label and click anywhere on the map to place a purple marker (not snapped to route, not tracked during animation)
 5. Use **Clear route**, **Fit map**, **Undo point** to manage the route
-6. Enter a name and click **Save** to persist the route (includes all stops, speed points, and custom points); use the dropdown and **Load** to restore
+6. Enter a name and click **Save** to persist the route (includes all stops, speed points, and custom points); click a name in the list below to load, click `×` to delete
 
 ### Navigation tab
 
 1. Set the start time, speed and unit (km/h or mph), and time acceleration (1×–150×)
-2. Click **Start** to begin animation
-3. Use **Pause** / **Stop** to control movement; **Stop** resets speed to default
-4. **Reverse direction** flips the route mid-animation
-5. The lists at the bottom show all scheduled stops and speed points in a single scrollable list sorted by route position, with real-time status: unvisited points show their duration/speed, passed stops show their start and end times
+2. Toggle **112 call notifications** to enable/disable the alarm markers and banner
+3. Click **Start** to begin animation
+4. Use **Pause** / **Stop** to control movement; **Stop** resets speed to default
+5. **Reverse direction** flips the route mid-animation
+6. **Follow mode** keeps the map centered on the moving marker
+7. The lists at the bottom show all scheduled stops and speed points in a single scrollable list sorted by route position, with real-time status
+
+## Sun widget details
+
+The widget renders the sky from a first-person perspective — the view shows the landscape in the direction of travel. Features:
+
+- **Sky colors** — computed with the Hosek-Wilkie model (via the `skylight` Python library) at Boquete coordinates, stored in `sky_colors.js`. Cross-faded by sun elevation. Directional dimming adjusts brightness based on sun position relative to viewing direction (stronger effect near sunrise/sunset, negligible at noon).
+- **Elevation scale** — vertical scale on the left edge with marks at 30°, 60°, and 90° (zenith), white with dark shadow for readability at any time of day. A yellow triangle indicates the current sun elevation.
+- **Compass** — north-up circle with N/E/S/W labels, a yellow arrow from center showing heading direction, and a sun icon (gradient body with 8 rays) at the sun's absolute azimuth.
+- **Mountain silhouette** — schematic mountain at ~1500 m distance, centered on the horizon.
+- **Toggle button** — ▼/▲ in the caption bar collapses or expands the entire widget.
 
 ## Sun data
 
-Sun position (elevation, azimuth) for the widget is pre-computed with the [astral](https://astral.readthedocs.io/) library for **Boquete, Panama (8.84309°N, 82.42467°W)** on **April 1, 2014**, local time UTC−5, at 5‑minute intervals.
+Sun position (elevation, azimuth) for the widget is pre-computed with the [astral](https://astral.readthedocs.io/) library for **Boquete, Panama (8.84309°N, 82.42467°W)** on **April 1, 2014**, local time UTC−5, at 5‑minute intervals. Position is linearly interpolated between entries for smooth animation.
+
+Sky colors generated with the [skylight](https://pypi.org/project/skylight/) library using the Hosek-Wilkie model, converted to sRGB via CIE xyY color space.
 
 - **`sun_data.js`** — lookup table with 288 entries
+- **`sky_colors.js`** — 63-entry color table (elevation -12° to 50°)
+- **`gen_all.py`** — regenerates both data files
+- **`sky_gen.py`** — generates sky_colors.js from Hosek-Wilkie model
+- **`fix_colors.py`** — post-processor ensuring minimum R channel for daytime sky
 
 ## Requirements
 

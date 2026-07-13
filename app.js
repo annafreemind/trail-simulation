@@ -52,6 +52,7 @@ const ALARM_TIMES = [
 let _112Fired = {};
 let _112Points = [];
 let _112PointMarkers = [];
+let _prevSimSec = -1;
 let scheduledStops = [];
 let scheduledStopMarkers = [];
 let isAddingStops = false;
@@ -218,6 +219,31 @@ function getPositionAtDistance(pts, distKm) {
         accumulated += segLen;
     }
     return pts[pts.length - 1];
+}
+
+function getBearingAtDistance(pts, distKm) {
+    if (distKm <= 0 || pts.length < 2) return 0;
+    let accumulated = 0;
+    for (let i = 1; i < pts.length; i++) {
+        const segLen = haversineKm(pts[i - 1], pts[i]);
+        if (accumulated + segLen >= distKm || i === pts.length - 1) {
+            const lat1 = pts[i - 1].lat * Math.PI / 180;
+            const lat2 = pts[i].lat * Math.PI / 180;
+            const dLon = (pts[i].lng - pts[i - 1].lng) * Math.PI / 180;
+            const y = Math.sin(dLon) * Math.cos(lat2);
+            const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
+            return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+        }
+        accumulated += segLen;
+    }
+    return 0;
+}
+
+function snapToCardinal(bearing) {
+    if (bearing >= 315 || bearing < 45) return 0;
+    if (bearing >= 45 && bearing < 135) return 90;
+    if (bearing >= 135 && bearing < 225) return 180;
+    return 270;
 }
 
 // ============================================================
@@ -648,6 +674,7 @@ function stopAnimation() {
     first112CallShown = false;
     traveledDistanceKm = 0;
     simElapsedSeconds = 0;
+    _prevSimSec = -1;
     btnStart.disabled = waypoints.length < 2;
     btnStart.textContent = 'Start';
     btnPause.disabled = true;
@@ -721,6 +748,7 @@ function startAnimation() {
     completedAnimation = false;
     isAtEnd = false;
     alarmTriggered = false;
+    _prevSimSec = -1;
     isPlaying = true;
     isPaused = false;
     btnStart.disabled = true;
@@ -777,11 +805,15 @@ function animationLoop(timestamp) {
     // Check 112 alarms
     if (document.getElementById('chk112').checked) {
         const st = getStartDateTime();
-        if (st) {
+        if (st && _prevSimSec >= 0) {
+            const prev = new Date(st.getTime() + _prevSimSec * 1000);
             const current = new Date(st.getTime() + simElapsedSeconds * 1000);
             for (const at of ALARM_TIMES) {
                 if (_112Fired[at.label]) continue;
-                if (current.getHours() > at.h || (current.getHours() === at.h && current.getMinutes() >= at.m)) {
+                const alarmMin = at.h * 60 + at.m;
+                const prevMin = prev.getHours() * 60 + prev.getMinutes();
+                const curMin = current.getHours() * 60 + current.getMinutes();
+                if (prevMin < alarmMin && curMin >= alarmMin) {
                     _112Fired[at.label] = true;
                     _112Points.push({ latlng: pos, label: at.label });
                     render112Points();
@@ -791,6 +823,7 @@ function animationLoop(timestamp) {
             }
         }
     }
+    _prevSimSec = simElapsedSeconds;
 
     // Check scheduled stops
     if (activeStopIndex < 0 && traveledDistanceKm > 0) {
@@ -1096,12 +1129,19 @@ console.log('Trail Animator ready — click the map to start!');
 // ============================================================
 const sunCanvas = document.getElementById('sunView');
 const sunCtx = sunCanvas.getContext('2d');
-let lastSunBucket = -1;
 
 function getSunAt(date) {
-    const idx = date.getHours() * 12 + Math.floor(date.getMinutes() / 5);
+    const totalMin = date.getHours() * 60 + date.getMinutes() + date.getSeconds() / 60;
+    const idx = Math.floor(totalMin / 5);
+    const t = (totalMin / 5) - idx;
     const row = sunData.table[idx];
-    return row ? { elev: row[2], azim: row[3] } : null;
+    const next = sunData.table[Math.min(idx + 1, sunData.table.length - 1)];
+    if (!row) return null;
+    if (!next) return { elev: row[2], azim: row[3] };
+    return {
+        elev: row[2] + (next[2] - row[2]) * t,
+        azim: row[3] + (next[3] - row[3]) * t
+    };
 }
 
 function lerpColor(a, b, t) {
@@ -1112,15 +1152,31 @@ function rgb(c) {
 }
 
 function drawSunView(date) {
-    const sun = getSunAt(date);
-    if (!sun) return;
-    const W = sunCanvas.width, H = sunCanvas.height;
-    const elev = Math.max(-12, Math.min(50, sun.elev));
-    const sx = 0, sw = W, sh = H;
-    const cx = W / 2;
-    const horizonY = sh * 0.58;
-    const arcR = sh * 0.42;
-    const azimLeft = 80, azimRight = 280;
+    try {
+        const sun = getSunAt(date);
+        if (!sun) { drawFallback(); return; }
+        const W = sunCanvas.width, H = sunCanvas.height;
+        const elev = Math.max(-12, Math.min(50, sun.elev));
+        const sx = 0, sw = W, sh = H;
+        const cx = W / 2;
+        const horizonY = sh * 0.72;
+        const arcR = sh * 0.42;
+
+let viewDir = 0;
+    if (waypoints.length >= 2 && isPlaying) {
+        const pts = reversed ? [...waypoints].reverse() : waypoints;
+        viewDir = getBearingAtDistance(pts, traveledDistanceKm);
+    }
+        if (viewDir === -1) viewDir = 0;
+    function card(a) { return ['N','E','S','W'][Math.round((a % 360) / 90) % 4]; }
+    const leftAzim = (viewDir + 260) % 360;
+    const rightAzim = (viewDir + 100) % 360;
+    function azimToFrac(a) {
+        let aa = a, la = leftAzim, ra = rightAzim;
+        if (la < ra) return (aa - la) / (ra - la);
+        if (aa < la) aa += 360;
+        return (aa - la) / (ra + 360 - la);
+    }
 
     // sky colors — lookup from Hosek-Wilkie table, interpolate
     const table = skyColorTable;
@@ -1130,8 +1186,12 @@ function drawSunView(date) {
     const tblT = Math.max(0, Math.min(1, (elev - a.e) / (b.e - a.e)));
     const skyTop = [a.t[0] + (b.t[0] - a.t[0]) * tblT, a.t[1] + (b.t[1] - a.t[1]) * tblT, a.t[2] + (b.t[2] - a.t[2]) * tblT];
     const skyHor = [a.h[0] + (b.h[0] - a.h[0]) * tblT, a.h[1] + (b.h[1] - a.h[1]) * tblT, a.h[2] + (b.h[2] - a.h[2]) * tblT];
-    // apply brightness envelope
-    const br = Math.max(0.05, (elev + 12) / 62);
+    // apply brightness envelope + directional factor
+    const sunRelAzim = ((sun.azim - viewDir + 540) % 360) - 180;
+    const directional = 0.55 + 0.45 * ((Math.cos(sunRelAzim * Math.PI / 180) + 1) / 2);
+    const elevFactor = Math.max(0, Math.min(1, (50 - elev) / 50));
+    const dirFactor = 1.0 - elevFactor * (1.0 - directional);
+    const br = Math.max(0.05, (elev + 12) / 62) * dirFactor;
     const bTop = [skyTop[0] * br, skyTop[1] * br, skyTop[2] * br];
     const bHor = [skyHor[0] * br, skyHor[1] * br, skyHor[2] * br];
 
@@ -1144,23 +1204,56 @@ function drawSunView(date) {
     sunCtx.fillStyle = grad;
     sunCtx.fillRect(0, 0, W, horizonY);
 
+    // elevation scale (left side, full height)
+    const scaleX = 12;
+    const scaleTop = 8;
+    const scaleBot = horizonY;
+    const scaleH = scaleBot - scaleTop;
+    sunCtx.strokeStyle = 'rgba(255,255,255,0.5)';
+    sunCtx.shadowColor = 'rgba(0,0,0,0.6)';
+    sunCtx.shadowBlur = 3;
+    sunCtx.lineWidth = 1.5;
+    sunCtx.beginPath();
+    sunCtx.moveTo(scaleX, scaleTop);
+    sunCtx.lineTo(scaleX, scaleBot);
+    sunCtx.stroke();
+
+    // tick marks
+    sunCtx.shadowColor = 'rgba(0,0,0,0.6)';
+    sunCtx.shadowBlur = 3;
+    sunCtx.fillStyle = '#fff';
+    sunCtx.font = 'bold 11px sans-serif';
+    sunCtx.textAlign = 'left';
+    [30, 60, 90].forEach(deg => {
+        const ty = scaleBot - scaleH * (deg / 90);
+        sunCtx.beginPath();
+        sunCtx.moveTo(scaleX - 4, ty);
+        sunCtx.lineTo(scaleX + 4, ty);
+        sunCtx.stroke();
+        sunCtx.fillText(`${deg}\u00b0`, scaleX + 7, ty + 4);
+    });
+    sunCtx.shadowBlur = 0;
+    // sun elevation marker
+    const markerY = scaleBot - scaleH * Math.max(0, Math.min(1, sun.elev / 90));
+    // bright triangle
+    sunCtx.fillStyle = '#ffe066';
+    sunCtx.shadowColor = 'rgba(0,0,0,0.5)';
+    sunCtx.shadowBlur = 4;
+    sunCtx.beginPath();
+    sunCtx.moveTo(scaleX + 3, markerY);
+    sunCtx.lineTo(scaleX - 7, markerY - 6);
+    sunCtx.lineTo(scaleX - 7, markerY + 6);
+    sunCtx.closePath();
+    sunCtx.fill();
+    // border
+    sunCtx.strokeStyle = 'rgba(255,255,255,0.7)';
+    sunCtx.lineWidth = 1;
+    sunCtx.stroke();
+    sunCtx.shadowBlur = 0;
+
     // ground
     sunCtx.fillStyle = 'rgba(40,55,40,0.5)';
     sunCtx.fillRect(0, horizonY, W, sh - horizonY);
-
-    // elevation arcs
-    sunCtx.strokeStyle = 'rgba(255,255,255,0.15)';
-    sunCtx.lineWidth = 1;
-    [30, 60].forEach(deg => {
-        const r = arcR * (deg / 90);
-        sunCtx.beginPath();
-        sunCtx.arc(cx, horizonY, r, -Math.PI, 0);
-        sunCtx.stroke();
-        // label
-        sunCtx.fillStyle = 'rgba(255,255,255,0.2)';
-        sunCtx.font = '9px sans-serif';
-        sunCtx.fillText(`${deg}\u00b0`, cx + r + 2, horizonY - 2);
-    });
 
     // horizon line
     sunCtx.strokeStyle = 'rgba(255,255,255,0.5)';
@@ -1189,89 +1282,118 @@ function drawSunView(date) {
     sunCtx.lineTo(mtnX, horizonY - mtnHeight);
     sunCtx.lineTo(mtnX + mtnWidth / 2, horizonY);
     sunCtx.stroke();
-    // vertical distance line: ground → peak
-    sunCtx.strokeStyle = 'rgba(255,255,255,0.3)';
-    sunCtx.lineWidth = 1;
-    sunCtx.setLineDash([3, 3]);
-    sunCtx.beginPath();
-    sunCtx.moveTo(mtnX + mtnWidth / 2 + 8, horizonY);
-    sunCtx.lineTo(mtnX + mtnWidth / 2 + 8, horizonY - mtnHeight);
-    sunCtx.stroke();
-    sunCtx.setLineDash([]);
-    // arrow tips
-    sunCtx.fillStyle = 'rgba(255,255,255,0.3)';
-    sunCtx.beginPath();
-    sunCtx.moveTo(mtnX + mtnWidth / 2 + 4, horizonY - 2);
-    sunCtx.lineTo(mtnX + mtnWidth / 2 + 8, horizonY);
-    sunCtx.lineTo(mtnX + mtnWidth / 2 + 12, horizonY - 2);
-    sunCtx.fill();
-    sunCtx.beginPath();
-    sunCtx.moveTo(mtnX + mtnWidth / 2 + 4, horizonY - mtnHeight + 2);
-    sunCtx.lineTo(mtnX + mtnWidth / 2 + 8, horizonY - mtnHeight);
-    sunCtx.lineTo(mtnX + mtnWidth / 2 + 12, horizonY - mtnHeight + 2);
-    sunCtx.fill();
-    // "1500m" label
-    sunCtx.fillStyle = 'rgba(255,255,255,0.4)';
-    sunCtx.font = '9px sans-serif';
-    sunCtx.textAlign = 'left';
-    sunCtx.fillText('1500m', mtnX + mtnWidth / 2 + 11, horizonY - mtnHeight / 2 + 3);
 
-    // sun position (azimuth: left=W~280°, right=E~80°)
-    const azimFrac = 1 - (sun.azim - azimLeft) / (azimRight - azimLeft);
-    const sunX = sx + azimFrac * sw;
-    const sunY = horizonY - arcR * Math.max(-1, Math.min(1, sun.elev / 90));
-    const isNight = sun.elev < 0;
-    const sunR = isNight ? 5 : 7;
-    const sunColor = isNight ? 'rgba(200,200,220,0.3)' : '#ffe066';
-    const glowColor = isNight ? 'rgba(200,200,220,0.05)' : 'rgba(255,230,100,0.35)';
+// compass — north-up, heading arrow, sun at absolute azimuth
+    const compR = 30;
+    const compCX = mtnX, compCY = horizonY + 28;
+    sunCtx.save();
+    sunCtx.translate(compCX, compCY);
 
-    // glow
-    sunCtx.beginPath();
-    sunCtx.arc(sunX, sunY, sunR * 3, 0, Math.PI * 2);
-    sunCtx.fillStyle = glowColor;
-    sunCtx.fill();
-
-    // sun body
-    sunCtx.beginPath();
-    sunCtx.arc(sunX, sunY, sunR, 0, Math.PI * 2);
-    sunCtx.fillStyle = sunColor;
-    sunCtx.fill();
-
-    // night: dashed arc below horizon
-    if (isNight) {
-        sunCtx.setLineDash([2, 3]);
-        sunCtx.strokeStyle = 'rgba(200,200,220,0.2)';
-        sunCtx.lineWidth = 1;
-        sunCtx.beginPath();
-        sunCtx.arc(cx, horizonY, arcR * (-sun.elev / 90), -Math.PI, 0);
-        sunCtx.stroke();
-        sunCtx.setLineDash([]);
+    function polar(a, r) {
+        const rad = (a - 90) * Math.PI / 180;
+        return [Math.cos(rad) * r, Math.sin(rad) * r];
     }
 
-    // labels
-    sunCtx.fillStyle = 'rgba(255,255,255,0.4)';
-    sunCtx.font = '9px sans-serif';
-    sunCtx.textAlign = 'center';
-    sunCtx.fillText('W', sx + 4, horizonY + 13);
-    sunCtx.fillText('E', sx + sw - 4, horizonY + 13);
-    sunCtx.textAlign = 'left';
+    // circle
+    sunCtx.strokeStyle = 'rgba(255,255,255,0.25)';
+    sunCtx.lineWidth = 1;
+    sunCtx.beginPath();
+    sunCtx.arc(0, 0, compR, 0, Math.PI * 2);
+    sunCtx.stroke();
+
+    // N/E/S/W labels
+    const dirs = [
+        { label: 'N', angle: 0,    col: 'rgba(255,255,255,0.45)' },
+        { label: 'E', angle: 90,   col: 'rgba(255,255,255,0.25)' },
+        { label: 'S', angle: 180,  col: 'rgba(255,255,255,0.25)' },
+        { label: 'W', angle: 270,  col: 'rgba(255,255,255,0.25)' },
+    ];
+    dirs.forEach(d => {
+        const [tx, ty] = polar(d.angle, compR + 12);
+        sunCtx.fillStyle = d.col;
+        sunCtx.font = '12px sans-serif';
+        sunCtx.textAlign = 'center';
+        sunCtx.textBaseline = 'middle';
+        sunCtx.fillText(d.label, tx, ty);
+    });
+
+    // heading arrow — thick line from center in heading direction
+    const [hx, hy] = polar(viewDir, compR - 3);
+    sunCtx.strokeStyle = '#ffe066';
+    sunCtx.lineWidth = 3;
+    sunCtx.beginPath();
+    sunCtx.moveTo(0, 0);
+    sunCtx.lineTo(hx, hy);
+    sunCtx.stroke();
+    // arrowhead
+    const aRad = (viewDir - 90) * Math.PI / 180;
+    const pR = aRad + Math.PI / 2;
+    sunCtx.fillStyle = '#ffe066';
+    sunCtx.beginPath();
+    sunCtx.moveTo(hx, hy);
+    sunCtx.lineTo(hx - Math.cos(aRad) * 7 + Math.cos(pR) * 4, hy - Math.sin(aRad) * 7 + Math.sin(pR) * 4);
+    sunCtx.lineTo(hx - Math.cos(aRad) * 7 - Math.cos(pR) * 4, hy - Math.sin(aRad) * 7 - Math.sin(pR) * 4);
+    sunCtx.closePath();
+    sunCtx.fill();
+
+    // sun icon
+    {
+        const [six, siy] = polar(sun.azim, compR + 12);
+        // glow
+        sunCtx.fillStyle = 'rgba(255,220,80,0.12)';
+        sunCtx.beginPath();
+        sunCtx.arc(six, siy, 12, 0, Math.PI * 2);
+        sunCtx.fill();
+        // rays
+        sunCtx.strokeStyle = 'rgba(255,210,60,0.5)';
+        sunCtx.lineWidth = 1.2;
+        for (let r = 0; r < 8; r++) {
+            const ra = r * Math.PI / 4;
+            sunCtx.beginPath();
+            sunCtx.moveTo(six + Math.cos(ra) * 7, siy + Math.sin(ra) * 7);
+            sunCtx.lineTo(six + Math.cos(ra) * 11, siy + Math.sin(ra) * 11);
+            sunCtx.stroke();
+        }
+        // body
+        const grad = sunCtx.createRadialGradient(six - 1, siy - 1, 0, six, siy, 6);
+        grad.addColorStop(0, '#fff8c0');
+        grad.addColorStop(0.5, '#ffe066');
+        grad.addColorStop(1, 'rgba(255,180,40,0.6)');
+        sunCtx.fillStyle = grad;
+        sunCtx.beginPath();
+        sunCtx.arc(six, siy, 6, 0, Math.PI * 2);
+        sunCtx.fill();
+    }
+
+    sunCtx.restore();
 
     // caption bar
-    const timeStr = `${String(date.getHours()).padStart(2, '0')}:${String(Math.floor(date.getMinutes() / 5) * 5).padStart(2, '0')}`;
-    sunCtx.fillStyle = 'rgba(0,0,0,0.55)';
-    sunCtx.fillRect(0, H - 32, W, 32);
-    sunCtx.fillStyle = '#fff';
-    sunCtx.font = '13px -apple-system, sans-serif';
-    sunCtx.textBaseline = 'middle';
-    sunCtx.fillText(`${timeStr}  ·  sun ${sun.elev.toFixed(1)}\u00b0`, 10, H - 16);
+    const timeStr = `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+    const info = document.getElementById('sunInfo');
+    if (info) info.textContent = `${timeStr}  ·  sun ${sun.elev.toFixed(1)}\u00b0`;
+    } catch(e) { console.error('drawSunView', e); drawFallback(); }
+}
+
+function drawFallback() {
+    const W = sunCanvas.width, H = sunCanvas.height;
+    sunCtx.fillStyle = '#1a1a2e';
+    sunCtx.fillRect(0, 0, W, H);
+    const horizonY = H * 0.58;
+    sunCtx.fillStyle = 'rgba(40,55,40,0.5)';
+    sunCtx.fillRect(0, horizonY, W, H - horizonY);
+    sunCtx.strokeStyle = 'rgba(255,255,255,0.5)';
+    sunCtx.beginPath();
+    sunCtx.moveTo(0, horizonY);
+    sunCtx.lineTo(W, horizonY);
+    sunCtx.stroke();
 }
 
 function updateSunView(date, force) {
-    if (!date) return;
-    const bucket = date.getHours() * 12 + Math.floor(date.getMinutes() / 5);
-    if (!force && bucket === lastSunBucket) return;
-    lastSunBucket = bucket;
-    drawSunView(date);
+    try {
+        if (date) drawSunView(date);
+    } catch(e) {
+        console.error('sun widget error', e);
+    }
 }
 
 function refreshSunView() {
@@ -1284,9 +1406,9 @@ refreshSunView();
 
 // Toggle sun widget
 document.getElementById('sunViewToggle').addEventListener('click', function () {
-    const canvas = document.getElementById('sunView');
-    canvas.classList.toggle('hidden');
-    this.textContent = canvas.classList.contains('hidden') ? '+' : '\u2212';
+    const container = document.querySelector('.sun-controls');
+    container.classList.toggle('collapsed');
+    this.textContent = container.classList.contains('collapsed') ? '▲' : '▼';
 });
 
 // ============================================================
