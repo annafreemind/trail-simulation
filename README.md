@@ -19,7 +19,8 @@ Built with [Leaflet](https://leafletjs.com) and OpenStreetMap tiles.
 - **Reverse direction** — toggle direction mid-animation
 - **Follow mode** — automatically pan the map with the marker during animation
 - **112 alarm** — configurable notification that triggers at 16:39; timer continues running, marker stops
-- **Save / Load routes** — persist routes (including waypoints, stops, speed points, and custom points) to `localStorage` by name. Routes are stored under the key `trail_routes` and are tied to the domain — clearing browser data or switching domains will remove them. Inspect via `JSON.parse(localStorage.getItem('trail_routes'))` in the browser console.
+- **Save / Load routes** — persist routes (including waypoints, stops, speed points, and custom points) to `localStorage` by name. The route list appears as items below the input — click a name to load, click `×` to delete. Routes are stored under the key `trail_routes` and are tied to the domain — clearing browser data or switching domains will remove them. Inspect via `JSON.parse(localStorage.getItem('trail_routes'))` in the browser console.
+- **Export / Import** — download all routes plus settings (unit, map layer, toggles) as a `.json` file and load it on another machine to restore everything
 - **Tabbed UI** — separate Route and Navigation panels
 - **Resizable sidebar** — drag the right edge to resize (240–600 px)
 - **Passed point tracking** — visited stops and activated speed points are marked with a green checkmark and strikethrough; the Navigation tab shows start and end times for completed stops and all points in a single combined scrollable list
@@ -67,6 +68,15 @@ The sidebar header contains controls always visible regardless of the active tab
 3. Use **Pause** / **Stop** to control movement; **Stop** resets speed to default
 4. **Reverse direction** flips the route mid-animation
 5. The lists at the bottom show all scheduled stops and speed points in a single scrollable list sorted by route position, with real-time status: unvisited points show their duration/speed, passed stops show their start and end times
+
+## Sun data
+
+Sun position (elevation, azimuth) for the widget is pre-computed with the [astral](https://astral.readthedocs.io/) library for **Boquete, Panama (8.78°N, 82.44°W)** on **April 1, 2014**, local time UTC−5, at 5‑minute intervals.
+
+- **`sun_data.js`** — lookup table with 288 entries
+- **`make_keyframes.py`** — generates 7 lighting keyframes from `images/trail.jpg` using PIL (tone curves, Purkinje blue shift, desaturation, Gaussian blur). Requires Pillow: `pip3 install Pillow`
+
+To regenerate keyframes: `python3 make_keyframes.py`
 
 ## Requirements
 

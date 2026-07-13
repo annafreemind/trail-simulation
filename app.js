@@ -945,54 +945,10 @@ function getSavedRoutes() {
     try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; } catch { return {}; }
 }
 
-function populateRouteSelect() {
-    const routes = getSavedRoutes();
-    const sel = document.getElementById('routeSelect');
-    sel.innerHTML = '<option value="">— Load route —</option>';
-    Object.keys(routes).forEach(name => {
-        const opt = document.createElement('option');
-        opt.value = name;
-        opt.textContent = name;
-        sel.appendChild(opt);
-    });
-}
-
-document.getElementById('btnSave').addEventListener('click', () => {
-    if (waypoints.length < 2) {
-        setStatus('Add at least 2 waypoints first', 'error');
-        return;
-    }
-    const name = document.getElementById('routeName').value.trim();
-    if (!name) {
-        setStatus('Enter a route name', 'error');
-        return;
-    }
-    const routes = getSavedRoutes();
-    routes[name] = {
-        waypoints: waypoints.map(p => ({ lat: p.lat, lng: p.lng })),
-        stops: scheduledStops.map(s => ({ lat: s.latlng.lat, lng: s.latlng.lng, label: s.label, duration: s.duration })),
-        speedPoints: speedPoints.map(sp => ({ lat: sp.latlng.lat, lng: sp.latlng.lng, label: sp.label, speed: sp.speed })),
-        customPoints: customPoints.map(cp => ({ lat: cp.latlng.lat, lng: cp.latlng.lng, label: cp.label }))
-    };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(routes));
-    populateRouteSelect();
-    document.getElementById('routeName').value = '';
-    setStatus(`Route "${name}" saved`, 'active');
-});
-
-document.getElementById('btnLoad').addEventListener('click', () => {
-    const sel = document.getElementById('routeSelect');
-    const name = sel.value;
-    if (!name) {
-        setStatus('Select a route to load', 'error');
-        return;
-    }
+function loadRoute(name) {
     const routes = getSavedRoutes();
     const data = routes[name];
-    if (!data) {
-        setStatus(`Route "${name}" not found`, 'error');
-        return;
-    }
+    if (!data) { setStatus(`Route "${name}" not found`, 'error'); return; }
     stopAnimation();
     waypoints = data.waypoints ? data.waypoints.map(p => L.latLng(p.lat, p.lng)) : data.map(p => L.latLng(p.lat, p.lng));
     redrawPath();
@@ -1016,13 +972,65 @@ document.getElementById('btnLoad').addEventListener('click', () => {
     updateStartButton();
     map.fitBounds(L.latLngBounds(waypoints), { padding: [50, 50] });
     setStatus(`Route "${name}" loaded`, 'active');
+}
+
+function populateRouteList() {
+    const routes = getSavedRoutes();
+    const el = document.getElementById('routeList');
+    const names = Object.keys(routes);
+    if (!names.length) { el.innerHTML = ''; return; }
+    el.innerHTML = names.map(name => `
+        <div style="display:flex;align-items:center;padding:3px 0;border-bottom:1px solid #1a2a4e">
+            <span class="route-name" data-name="${name}" style="flex:1;cursor:pointer;color:#aabbdd;font-size:13px">${name}</span>
+            <span class="del-route" data-name="${name}" style="color:#e74c3c;cursor:pointer;font-size:15px;font-weight:700;line-height:1;padding:0 4px">×</span>
+        </div>
+    `).join('');
+}
+
+document.getElementById('routeList').addEventListener('click', (e) => {
+    const nameEl = e.target.closest('.route-name');
+    if (nameEl) {
+        document.getElementById('routeName').value = nameEl.dataset.name;
+        loadRoute(nameEl.dataset.name);
+        return;
+    }
+    const del = e.target.closest('.del-route');
+    if (del) {
+        const name = del.dataset.name;
+        if (!confirm(`Delete route "${name}"?`)) return;
+        const routes = getSavedRoutes();
+        delete routes[name];
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(routes));
+        populateRouteList();
+        document.getElementById('routeName').value = '';
+        setStatus(`Route "${name}" deleted`, '');
+    }
 });
 
-document.getElementById('routeSelect').addEventListener('change', () => {
-    document.getElementById('btnLoad').click();
+document.getElementById('btnSave').addEventListener('click', () => {
+    if (waypoints.length < 2) {
+        setStatus('Add at least 2 waypoints first', 'error');
+        return;
+    }
+    const name = document.getElementById('routeName').value.trim();
+    if (!name) {
+        setStatus('Enter a route name', 'error');
+        return;
+    }
+    const routes = getSavedRoutes();
+    routes[name] = {
+        waypoints: waypoints.map(p => ({ lat: p.lat, lng: p.lng })),
+        stops: scheduledStops.map(s => ({ lat: s.latlng.lat, lng: s.latlng.lng, label: s.label, duration: s.duration })),
+        speedPoints: speedPoints.map(sp => ({ lat: sp.latlng.lat, lng: sp.latlng.lng, label: sp.label, speed: sp.speed })),
+        customPoints: customPoints.map(cp => ({ lat: cp.latlng.lat, lng: cp.latlng.lng, label: cp.label }))
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(routes));
+    populateRouteList();
+    document.getElementById('routeName').value = '';
+    setStatus(`Route "${name}" saved`, 'active');
 });
 
-populateRouteSelect();
+populateRouteList();
 
 if (elSpeedUnit.value === 'mph') {
     elSpeed.value = '1.0';
@@ -1252,4 +1260,62 @@ document.getElementById('sunViewToggle').addEventListener('click', function () {
     const canvas = document.getElementById('sunView');
     canvas.classList.toggle('hidden');
     this.textContent = canvas.classList.contains('hidden') ? '+' : '\u2212';
+});
+
+// ============================================================
+//   Export / Import
+// ============================================================
+document.getElementById('btnExport').addEventListener('click', () => {
+    const data = {
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        routes: getSavedRoutes(),
+        settings: {
+            speedUnit: document.getElementById('speedUnit').value,
+            mapLayer: document.getElementById('mapLayer').value,
+            chkLabels: document.getElementById('chkLabels').checked,
+            chkFollow: document.getElementById('chkFollow').checked,
+        }
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `trail-routes-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    setStatus('Routes exported', '');
+});
+
+document.getElementById('btnImport').addEventListener('click', () => {
+    document.getElementById('importFile').click();
+});
+
+document.getElementById('importFile').addEventListener('change', function (e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+        try {
+            const data = JSON.parse(ev.target.result);
+            if (!data.routes || typeof data.routes !== 'object') {
+                setStatus('Invalid file format', 'error');
+                return;
+            }
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(data.routes));
+            if (data.settings) {
+                const s = data.settings;
+                if (s.speedUnit) document.getElementById('speedUnit').value = s.speedUnit;
+                if (s.mapLayer) document.getElementById('mapLayer').value = s.mapLayer;
+                if (s.chkLabels !== undefined) document.getElementById('chkLabels').checked = s.chkLabels;
+                if (s.chkFollow !== undefined) document.getElementById('chkFollow').checked = s.chkFollow;
+            }
+            populateRouteList();
+            setStatus(`${Object.keys(data.routes).length} route(s) imported`, '');
+        } catch (err) {
+            setStatus('Failed to parse file', 'error');
+        }
+    };
+    reader.readAsText(file);
+    this.value = '';
 });

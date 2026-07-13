@@ -99,15 +99,11 @@
                         <button class="btn btn-primary" id="btnSave" style="height:100%">Save</button>
                     </div>
                 </div>
-                <div class="ctrl-row">
-                    <div class="ctrl-group" style="flex:2">
-                        <select id="routeSelect" style="background:#0f1a30;border:1px solid #2a3a5e;border-radius:6px;padding:9px 12px;color:#f0f4ff;font-size:14px;outline:none;width:100%">
-                            <option value="">— Load route —</option>
-                        </select>
-                    </div>
-                    <div class="ctrl-group" style="flex:1">
-                        <button class="btn btn-outline" id="btnLoad" style="height:100%">Load</button>
-                    </div>
+                <div id="routeList" style="max-height:120px;overflow-y:auto;font-size:13px;color:#8899bb"></div>
+                <div style="display:flex;gap:4px;margin-top:2px">
+                    <button class="btn btn-outline" id="btnExport" style="flex:1;padding:6px 0;font-size:12px">Export</button>
+                    <button class="btn btn-outline" id="btnImport" style="flex:1;padding:6px 0;font-size:12px">Import</button>
+                    <input type="file" id="importFile" accept=".json" style="display:none" />
                 </div>
 
                 <div style="border-top:1px solid #2a3a5e;margin:6px 0"></div>
