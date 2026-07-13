@@ -1187,11 +1187,7 @@ let viewDir = 0;
     const skyTop = [a.t[0] + (b.t[0] - a.t[0]) * tblT, a.t[1] + (b.t[1] - a.t[1]) * tblT, a.t[2] + (b.t[2] - a.t[2]) * tblT];
     const skyHor = [a.h[0] + (b.h[0] - a.h[0]) * tblT, a.h[1] + (b.h[1] - a.h[1]) * tblT, a.h[2] + (b.h[2] - a.h[2]) * tblT];
     // apply brightness envelope + directional factor
-    const sunRelAzim = ((sun.azim - viewDir + 540) % 360) - 180;
-    const directional = 0.55 + 0.45 * ((Math.cos(sunRelAzim * Math.PI / 180) + 1) / 2);
-    const elevFactor = Math.max(0, Math.min(1, (50 - elev) / 50));
-    const dirFactor = 1.0 - elevFactor * (1.0 - directional);
-    const br = Math.max(0.05, (elev + 12) / 62) * dirFactor;
+    const br = Math.max(0.05, (elev + 12) / 62);
     const bTop = [skyTop[0] * br, skyTop[1] * br, skyTop[2] * br];
     const bHor = [skyHor[0] * br, skyHor[1] * br, skyHor[2] * br];
 
