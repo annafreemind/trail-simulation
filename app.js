@@ -98,6 +98,15 @@ L.marker([8.842428, -82.425013], {
     zIndexOffset: 500,
 }).addTo(map);
 
+L.circleMarker([8.878563, -82.408597], {
+    radius: 14,
+    color: '#e74c3c',
+    weight: 2,
+    fillColor: 'transparent',
+    fillOpacity: 0,
+    zIndexOffset: 500,
+}).addTo(map).bindTooltip('Kris shorts', { permanent: true, direction: 'top', offset: [0, -4] });
+
 // ============================================================
 //   Helpers
 // ============================================================
