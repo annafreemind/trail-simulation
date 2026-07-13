@@ -10,6 +10,7 @@ const EARTH_RADIUS_KM = 6371;
 // ============================================================
 const elStartTime = document.getElementById('startTime');
 const elSpeed = document.getElementById('speed');
+const elSpeedUnit = document.getElementById('speedUnit');
 const elTimeScale = document.getElementById('timeScale');
 const elTimeScaleLabel = document.getElementById('timeScaleLabel');
 const btnStart = document.getElementById('btnStart');
@@ -100,11 +101,14 @@ function pathLength(pts) {
 }
 
 function formatDistance(km) {
+    const isMph = speedUnit() === 'mph';
+    const val = isMph ? km * 0.621371 : km;
+    const unit = isMph ? ' mi' : ' km';
     if (km < 0.01) return '0 m';
-    if (km < 1) return (km * 1000).toFixed(0) + ' m';
-    if (km < 10) return km.toFixed(2) + ' km';
-    if (km < 100) return km.toFixed(1) + ' km';
-    return km.toFixed(0) + ' km';
+    if (val < 1) return (val * (isMph ? 5280 : 1000)).toFixed(0) + (isMph ? ' ft' : ' m');
+    if (val < 10) return val.toFixed(2) + unit;
+    if (val < 100) return val.toFixed(1) + unit;
+    return val.toFixed(0) + unit;
 }
 
 function formatDuration(sec) {
@@ -271,11 +275,12 @@ map.on('click', (e) => {
         if (waypoints.length < 2) { setStatus('Draw a route first', 'error'); return; }
         const pt = closestPointOnRoute(e.latlng);
         const label = document.getElementById('speedLabel').value.trim() || 'Speed change ' + (speedPoints.length + 1);
-        const speed = parseFloat(document.getElementById('speedValue').value) || 5;
+        const speedIn = parseFloat(document.getElementById('speedValue').value) || 5;
+        const speed = speedUnit() === 'mph' ? speedIn / 0.621371 : speedIn;
         speedPoints.push({ latlng: pt, label, speed, activated: false, routeDist: getRouteDistance(pt) });
         sortByRoute(speedPoints);
         renderSpeedPoints();
-        setStatus(`Speed point "${label}" added (${speed} km/h)`, '');
+        setStatus(`Speed point "${label}" added (${formatSpeed(speed)})`, '');
         return;
     }
     waypoints.push(e.latlng);
@@ -294,6 +299,24 @@ function updateStartButton() {
 }
 
 elSpeed.addEventListener('input', updateStartButton);
+elSpeedUnit.addEventListener('change', () => {
+    const isMph = speedUnit() === 'mph';
+    const val = parseFloat(elSpeed.value);
+    if (val === 1.7 && isMph) elSpeed.value = '1.0';
+    else if (val === 1.0 && !isMph) elSpeed.value = '1.7';
+    else if (val) elSpeed.value = isMph ? (val * 0.621371).toFixed(1) : (val / 0.621371).toFixed(1);
+
+    const sv = document.getElementById('speedValue');
+    const svVal = parseFloat(sv.value);
+    if (svVal === 1.7 && isMph) sv.value = '1.0';
+    else if (svVal === 1.0 && !isMph) sv.value = '1.7';
+    else if (svVal) sv.value = isMph ? (svVal * 0.621371).toFixed(1) : (svVal / 0.621371).toFixed(1);
+
+    infoCurrentSpeed.textContent = formatSpeed(getSpeedKmh());
+    updateStartButton();
+    updateInfo();
+    renderSpeedPoints();
+});
 
 // ============================================================
 //   Clear
@@ -360,7 +383,7 @@ function renderNavList() {
     combinedNavList.innerHTML = all.map(item => {
         const passed = item.type === 'stop' ? item.visited : item.activated;
         const color = item.type === 'stop' ? '#f39c12' : '#2ecc71';
-        const detail = item.type === 'stop' ? formatStopDuration(item.duration) : item.speed + ' km/h';
+        const detail = item.type === 'stop' ? formatStopDuration(item.duration) : formatSpeed(item.speed);
         const timeStr = item.type === 'stop' && passed && item.startTime
             ? `${item.startTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })}–${item.endTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })}`
             : detail;
@@ -391,7 +414,7 @@ function renderScheduledStops() {
             fillOpacity: s.visited ? 0.4 : 1,
             zIndexOffset: 600,
         }).addTo(map);
-        m.bindTooltip(`${s.label} (${formatStopDuration(s.duration)})`, { direction: 'top', offset: [0, -4] });
+        m.bindTooltip(`${s.label} (${formatStopDuration(s.duration)})`, { permanent: true, direction: 'top', offset: [0, -4] });
         scheduledStopMarkers.push(m);
     });
     renderNavList();
@@ -412,7 +435,7 @@ function renderSpeedPoints() {
     speedPointList.innerHTML = speedPoints.map((s, i) => {
         const passed = s.activated;
         return `<div style="padding:2px 0;border-bottom:1px solid #1a2a4e;display:flex;justify-content:space-between;align-items:center;opacity:${passed ? 0.5 : 1}">
-            <span><span style="color:${passed ? '#2ecc71' : '#2ecc71'}">${passed ? '\u2713' : '\u25cf'}</span> <span style="text-decoration:${passed ? 'line-through' : 'none'}">${s.label}</span> <span style="color:#8899bb">${s.speed} km/h</span></span>
+            <span><span style="color:${passed ? '#2ecc71' : '#2ecc71'}">${passed ? '\u2713' : '\u25cf'}</span> <span style="text-decoration:${passed ? 'line-through' : 'none'}">${s.label}</span> <span style="color:#8899bb">${formatSpeed(s.speed)}</span></span>
             <span class="del-speed" data-index="${i}" style="color:#e74c3c;cursor:pointer;font-size:14px;font-weight:700;line-height:1">\u00d7</span>
         </div>`;
     }).join('');
@@ -425,7 +448,7 @@ function renderSpeedPoints() {
             fillOpacity: s.activated ? 0.5 : 1,
             zIndexOffset: 600,
         }).addTo(map);
-        m.bindTooltip(`${s.label} (${s.speed} km/h)`, { direction: 'top', offset: [0, -4] });
+        m.bindTooltip(`${s.label} (${formatSpeed(s.speed)})`, { direction: 'top', offset: [0, -4], permanent: true });
         speedPointMarkers.push(m);
     });
     renderNavList();
@@ -500,7 +523,16 @@ function resetTimerDisplay() {
 }
 
 function getSpeedKmh() {
-    return parseFloat(elSpeed.value) || 0;
+    const val = parseFloat(elSpeed.value) || 0;
+    return elSpeedUnit.value === 'mph' ? val / 0.621371 : val;
+}
+function speedUnit() { return elSpeedUnit.value; }
+function formatSpeed(kmh) {
+    const val = speedUnit() === 'mph' ? kmh * 0.621371 : kmh;
+    return val.toFixed(1) + ' ' + speedUnit();
+}
+function formatSpeedVal(kmh) {
+    return speedUnit() === 'mph' ? kmh * 0.621371 : kmh;
 }
 
 function startAnimation() {
@@ -587,7 +619,7 @@ function animationLoop(timestamp) {
                 first112CallShown = true;
                 alarmTriggered = true;
                 showAlarm();
-                infoCurrentSpeed.textContent = '0 km/h';
+                infoCurrentSpeed.textContent = '0 ' + speedUnit();
                 setStatus('112 call — movement stopped', 'error');
             }
         }
@@ -637,7 +669,7 @@ function animationLoop(timestamp) {
                 s.startTime = st ? new Date(st.getTime() + simElapsedSeconds * 1000) : null;
                 s.endTime = s.startTime ? new Date(s.startTime.getTime() + s.duration * 1000) : null;
                 setStatus(`Arrived at "${s.label}" — stopping for ${formatStopDuration(s.duration)}`, '');
-                infoCurrentSpeed.textContent = '0 km/h';
+                infoCurrentSpeed.textContent = '0 ' + speedUnit();
                 renderScheduledStops();
                 break;
             }
@@ -651,8 +683,8 @@ function animationLoop(timestamp) {
         const triggerAt = reversed ? totalDistanceKm - sp.routeDist : sp.routeDist;
         if (traveledDistanceKm >= triggerAt) {
             sp.activated = true;
-            elSpeed.value = sp.speed;
-            setStatus(`Speed changed to ${sp.speed} km/h at "${sp.label}"`, '');
+            elSpeed.value = formatSpeedVal(sp.speed);
+            setStatus(`Speed changed to ${formatSpeed(sp.speed)} at "${sp.label}"`, '');
             renderSpeedPoints();
             break;
         }
@@ -663,11 +695,11 @@ function animationLoop(timestamp) {
         movingMarker.setLatLng(finalPos);
         traveledDistanceKm = totalDistanceKm;
         isAtEnd = true;
-        infoCurrentSpeed.textContent = '0 km/h';
+        infoCurrentSpeed.textContent = '0 ' + speedUnit();
         setStatus('Route completed — timer running', 'active');
     }
 
-    infoCurrentSpeed.textContent = (getSpeedKmh()).toFixed(1) + ' km/h';
+    infoCurrentSpeed.textContent = formatSpeed(getSpeedKmh());
     updateTimerDisplay(simElapsedSeconds);
     updateCurrentTime(simElapsedSeconds);
 
@@ -717,13 +749,12 @@ btnPause.addEventListener('click', () => {
         isPaused = true;
         btnPause.textContent = 'Resume';
         setStatus('Paused', '');
-        infoCurrentSpeed.textContent = '0 km/h';
+        infoCurrentSpeed.textContent = '0 ' + speedUnit();
     } else {
         isPaused = false;
         btnPause.textContent = 'Pause';
         lastFrameTimestamp = performance.now();
-        const speed = getSpeedKmh();
-        infoCurrentSpeed.textContent = speed.toFixed(1) + ' km/h';
+        infoCurrentSpeed.textContent = formatSpeed(getSpeedKmh());
         setStatus('Movement resumed', 'active');
     }
 });
@@ -889,5 +920,10 @@ document.getElementById('routeSelect').addEventListener('change', () => {
 });
 
 populateRouteSelect();
+
+if (elSpeedUnit.value === 'mph') {
+    elSpeed.value = '1.0';
+    document.getElementById('speedValue').value = '1.0';
+}
 
 console.log('Trail Animator ready — click the map to start!');

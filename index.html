@@ -27,9 +27,13 @@
                 <small>draw route · animate movement</small>
             </h1>
 
-            <div style="display:flex;gap:4px;margin-bottom:6px">
-                <button class="tab-btn active" data-tab="route">Route</button>
-                <button class="tab-btn" data-tab="nav">Navigation</button>
+            <div style="display:flex;gap:4px;align-items:center;margin-bottom:6px">
+                <select id="speedUnit" style="flex:0 0 70px;background:#0f1a30;border:1px solid #2a3a5e;border-radius:6px;padding:6px 4px;color:#f0f4ff;font-size:12px;outline:none">
+                    <option value="kmh">km/h</option>
+                    <option value="mph">mph</option>
+                </select>
+                <button class="tab-btn active" data-tab="route" style="flex:1">Route</button>
+                <button class="tab-btn" data-tab="nav" style="flex:1">Navigation</button>
             </div>
 
             <!-- ===== TAB: ROUTE ===== -->
@@ -57,7 +61,7 @@
                 <div id="speedInputs" style="display:none;margin:4px 0;padding:4px;background:#0a1528;border-radius:4px">
                     <div style="display:flex;gap:4px;align-items:center;margin-bottom:3px">
                         <input type="text" id="speedLabel" placeholder="Label" style="flex:1;background:#0f1a30;border:1px solid #2a3a5e;border-radius:4px;padding:6px 8px;color:#f0f4ff;font-size:12px;outline:none" />
-                        <input type="number" id="speedValue" placeholder="km/h" value="1.7" min="0.1" step="0.1" style="width:60px;background:#0f1a30;border:1px solid #2a3a5e;border-radius:4px;padding:6px 8px;color:#f0f4ff;font-size:12px;outline:none" />
+                        <input type="number" id="speedValue" placeholder="Speed" value="1.7" min="0.1" step="0.1" style="width:70px;background:#0f1a30;border:1px solid #2a3a5e;border-radius:4px;padding:6px 8px;color:#f0f4ff;font-size:12px;outline:none" />
                     </div>
                     <div style="font-size:11px;color:#8899bb">Click on the route to place a speed point</div>
                 </div>
@@ -103,8 +107,8 @@
                         <label for="startTime">Start time</label>
                         <input type="time" id="startTime" value="13:15" />
                     </div>
-                    <div class="ctrl-group">
-                        <label for="speed">Speed (km/h)</label>
+                    <div class="ctrl-group" style="flex:1">
+                        <label for="speed">Speed</label>
                         <input type="number" id="speed" value="1.7" min="0.1" step="0.1" />
                     </div>
                 </div>
@@ -116,7 +120,7 @@
 
                 <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#aabbdd;cursor:pointer;padding:4px 0">
                     <input type="checkbox" id="chk112" checked style="accent-color:#4a7cf7;width:16px;height:16px;cursor:pointer" />
-                    Notify about 112 call
+                    First 112 call notification
                 </label>
 
                 <div class="btn-group">
