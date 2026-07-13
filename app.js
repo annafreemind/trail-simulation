@@ -64,10 +64,29 @@ const map = L.map('map', {
     zoomControl: true,
 });
 
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19,
     attribution: '&copy; <a href="https://openstreetmap.org/copyright">OpenStreetMap</a> contributors',
 }).addTo(map);
+
+const topoLayer = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+    maxZoom: 17,
+    attribution: '&copy; <a href="https://opentopomap.org">OpenTopoMap</a> contributors',
+});
+
+let currentLayer = osmLayer;
+
+document.getElementById('mapLayer').addEventListener('change', function() {
+    if (this.value === 'topo' && currentLayer !== topoLayer) {
+        map.removeLayer(currentLayer);
+        topoLayer.addTo(map);
+        currentLayer = topoLayer;
+    } else if (this.value === 'osm' && currentLayer !== osmLayer) {
+        map.removeLayer(currentLayer);
+        osmLayer.addTo(map);
+        currentLayer = osmLayer;
+    }
+});
 
 L.marker([8.842428, -82.425013], {
     icon: L.divIcon({
@@ -367,9 +386,14 @@ btnReverse.addEventListener('click', () => {
 });
 
 const chkFollow = document.getElementById('chkFollow');
+const chkLabels = document.getElementById('chkLabels');
 chkFollow.addEventListener('change', () => {
     followMode = chkFollow.checked;
     setStatus(followMode ? 'Follow mode on' : 'Follow mode off', '');
+});
+chkLabels.addEventListener('change', () => {
+    renderScheduledStops();
+    renderSpeedPoints();
 });
 
 const scheduledStopList = document.getElementById('scheduledStopList');
@@ -414,7 +438,9 @@ function renderScheduledStops() {
             fillOpacity: s.visited ? 0.4 : 1,
             zIndexOffset: 600,
         }).addTo(map);
-        m.bindTooltip(`${s.label} (${formatStopDuration(s.duration)})`, { permanent: true, direction: 'top', offset: [0, -4] });
+        if (chkLabels.checked) {
+            m.bindTooltip(`${s.label} (${formatStopDuration(s.duration)})`, { permanent: true, direction: 'top', offset: [0, -4] });
+        }
         scheduledStopMarkers.push(m);
     });
     renderNavList();
@@ -448,7 +474,9 @@ function renderSpeedPoints() {
             fillOpacity: s.activated ? 0.5 : 1,
             zIndexOffset: 600,
         }).addTo(map);
-        m.bindTooltip(`${s.label} (${formatSpeed(s.speed)})`, { direction: 'top', offset: [0, -4], permanent: true });
+        if (chkLabels.checked) {
+            m.bindTooltip(`${s.label} (${formatSpeed(s.speed)})`, { permanent: true, direction: 'top', offset: [0, -4] });
+        }
         speedPointMarkers.push(m);
     });
     renderNavList();
