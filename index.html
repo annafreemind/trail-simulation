@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Trail Simulation</title>
+    <link
+        rel="stylesheet"
+        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+        crossorigin=""
+    />
+    <script
+        src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+        crossorigin=""
+    ></script>
+    <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+    <div id="app">
+        <!-- Sidebar -->
+        <div id="sidebar">
+            <div id="sidebar-resizer"></div>
+            <h1>
+                Trail Simulation
+                <small>draw route · animate movement</small>
+            </h1>
+
+            <div style="display:flex;gap:4px;margin-bottom:6px">
+                <button class="tab-btn active" data-tab="route">Route</button>
+                <button class="tab-btn" data-tab="nav">Navigation</button>
+            </div>
+
+            <!-- ===== TAB: ROUTE ===== -->
+            <div id="tabRoute" class="tab-content">
+                <div class="btn-group">
+                    <button class="btn btn-outline" id="btnClear">Clear route</button>
+                    <button class="btn btn-outline" id="btnFit">Fit map</button>
+                    <button class="btn btn-outline" id="btnUndo" disabled>Undo point</button>
+                </div>
+
+                <div style="display:flex;gap:4px;font-size:12px">
+                    <button class="mode-btn active" data-mode="waypoint" style="flex:1;padding:5px 0;border:1px solid #2a3a5e;border-radius:4px;background:transparent;color:#8899bb;cursor:pointer;font-weight:600;transition:all .2s">Route points</button>
+                    <button class="mode-btn" data-mode="stop" style="flex:1;padding:5px 0;border:1px solid #2a3a5e;border-radius:4px;background:transparent;color:#f39c12;cursor:pointer;font-weight:600;transition:all .2s">Stops</button>
+                    <button class="mode-btn" data-mode="speed" style="flex:1;padding:5px 0;border:1px solid #2a3a5e;border-radius:4px;background:transparent;color:#2ecc71;cursor:pointer;font-weight:600;transition:all .2s">Speed</button>
+                </div>
+
+                <div id="stopInputs" style="display:none;margin:4px 0;padding:4px;background:#0a1528;border-radius:4px">
+                    <div style="display:flex;gap:4px;align-items:center;margin-bottom:3px">
+                        <input type="text" id="stopLabel" placeholder="Label" value="" style="flex:1;background:#0f1a30;border:1px solid #2a3a5e;border-radius:4px;padding:6px 8px;color:#f0f4ff;font-size:12px;outline:none" />
+                        <input type="text" id="stopDuration" placeholder="MM:SS" value="02:00" inputmode="numeric" style="width:65px;background:#0f1a30;border:1px solid #2a3a5e;border-radius:4px;padding:6px 8px;color:#f0f4ff;font-size:12px;outline:none;text-align:center;font-family:monospace" />
+                    </div>
+                    <div style="font-size:11px;color:#8899bb">Click on the route to place a stop</div>
+                </div>
+
+                <div id="speedInputs" style="display:none;margin:4px 0;padding:4px;background:#0a1528;border-radius:4px">
+                    <div style="display:flex;gap:4px;align-items:center;margin-bottom:3px">
+                        <input type="text" id="speedLabel" placeholder="Label" style="flex:1;background:#0f1a30;border:1px solid #2a3a5e;border-radius:4px;padding:6px 8px;color:#f0f4ff;font-size:12px;outline:none" />
+                        <input type="number" id="speedValue" placeholder="km/h" value="1.7" min="0.1" step="0.1" style="width:60px;background:#0f1a30;border:1px solid #2a3a5e;border-radius:4px;padding:6px 8px;color:#f0f4ff;font-size:12px;outline:none" />
+                    </div>
+                    <div style="font-size:11px;color:#8899bb">Click on the route to place a speed point</div>
+                </div>
+
+                <div id="scheduledStopList" style="max-height:80px;overflow-y:auto;font-size:12px;color:#8899bb"></div>
+                <div id="speedPointList" style="max-height:80px;overflow-y:auto;font-size:12px;color:#8899bb"></div>
+
+                <div style="border-top:1px solid #2a3a5e;margin:6px 0"></div>
+                <div class="ctrl-row">
+                    <div class="ctrl-group" style="flex:2">
+                        <input type="text" id="routeName" placeholder="Route name" style="background:#0f1a30;border:1px solid #2a3a5e;border-radius:6px;padding:9px 12px;color:#f0f4ff;font-size:14px;outline:none;width:100%" />
+                    </div>
+                    <div class="ctrl-group" style="flex:1">
+                        <button class="btn btn-primary" id="btnSave" style="height:100%">Save</button>
+                    </div>
+                </div>
+                <div class="ctrl-row">
+                    <div class="ctrl-group" style="flex:2">
+                        <select id="routeSelect" style="background:#0f1a30;border:1px solid #2a3a5e;border-radius:6px;padding:9px 12px;color:#f0f4ff;font-size:14px;outline:none;width:100%">
+                            <option value="">— Load route —</option>
+                        </select>
+                    </div>
+                    <div class="ctrl-group" style="flex:1">
+                        <button class="btn btn-outline" id="btnLoad" style="height:100%">Load</button>
+                    </div>
+                </div>
+
+                <div style="border-top:1px solid #2a3a5e;margin:6px 0"></div>
+                <div class="info-row">
+                    <span class="label">Waypoints</span>
+                    <span class="value" id="infoPoints">0</span>
+                </div>
+                <div class="info-row">
+                    <span class="label">Distance</span>
+                    <span class="value" id="infoDistance">—</span>
+                </div>
+            </div>
+
+            <!-- ===== TAB: NAVIGATION ===== -->
+            <div id="tabNav" class="tab-content" style="display:none">
+                <div class="ctrl-row">
+                    <div class="ctrl-group">
+                        <label for="startTime">Start time</label>
+                        <input type="time" id="startTime" value="13:15" />
+                    </div>
+                    <div class="ctrl-group">
+                        <label for="speed">Speed (km/h)</label>
+                        <input type="number" id="speed" value="1.7" min="0.1" step="0.1" />
+                    </div>
+                </div>
+
+                <div class="ctrl-group">
+                    <label for="timeScale">Time acceleration: <span id="timeScaleLabel">1</span>×</label>
+                    <input type="range" id="timeScale" min="1" max="150" step="0.1" value="1" />
+                </div>
+
+                <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#aabbdd;cursor:pointer;padding:4px 0">
+                    <input type="checkbox" id="chk112" checked style="accent-color:#4a7cf7;width:16px;height:16px;cursor:pointer" />
+                    Notify about 112 call
+                </label>
+
+                <div class="btn-group">
+                    <button class="btn btn-success" id="btnStart" disabled>Start</button>
+                    <button class="btn btn-warning" id="btnPause" disabled>Pause</button>
+                    <button class="btn btn-danger" id="btnStop" disabled>Stop</button>
+                </div>
+                <div class="btn-group">
+                    <button class="btn btn-outline" id="btnReverse">Reverse direction</button>
+                </div>
+                <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#aabbdd;cursor:pointer;padding:4px 0">
+                    <input type="checkbox" id="chkFollow" style="accent-color:#4a7cf7;width:16px;height:16px;cursor:pointer" />
+                    Follow mode
+                </label>
+
+                <div style="border-top:1px solid #2a3a5e;margin:6px 0"></div>
+                <div class="info-row">
+                    <span class="label">Timer</span>
+                    <span class="value highlight" id="infoTimer">00:00:00</span>
+                </div>
+                <div class="info-row">
+                    <span class="label">Current time</span>
+                    <span class="value" id="infoCurrentTime">—</span>
+                </div>
+                <div class="info-row">
+                    <span class="label">Speed</span>
+                    <span class="value" id="infoCurrentSpeed">—</span>
+                </div>
+
+                <div style="border-top:1px solid #2a3a5e;margin:6px 0"></div>
+                <div id="combinedNavList" style="max-height:220px;overflow-y:auto;font-size:12px;color:#8899bb"></div>
+            </div>
+
+            <!-- Status -->
+            <div id="status-bar" style="margin-top:auto;padding-top:8px;border-top:1px solid #2a3a5e">Click the map to start building a route</div>
+        </div>
+
+        <!-- Map -->
+        <div id="map"></div>
+        <div id="alarm" style="display:none;position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:10000;background:#5c1a1a;border:2px solid #e74c3c;border-radius:8px;padding:12px 24px;text-align:center;font-size:18px;font-weight:700;color:#ff6b6b;box-shadow:0 4px 20px rgba(0,0,0,.5)">First 112 call</div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
