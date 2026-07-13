@@ -54,6 +54,9 @@ let activeStopIndex = -1;
 let speedPoints = [];
 let speedPointMarkers = [];
 let isAddingSpeedPoints = false;
+let customPoints = [];
+let customPointMarkers = [];
+let isAddingCustomPoints = false;
 
 // ============================================================
 //   Map
@@ -255,19 +258,20 @@ function redrawPath() {
     }
     markers.forEach((m) => map.removeLayer(m));
     markers = [];
-    if (waypoints.length < 2) return;
 
-    polyline = L.polyline(waypoints, {
-        color: '#4a7cf7',
-        weight: 4,
-        opacity: 0.85,
-        dashArray: null,
-    }).addTo(map);
+    if (waypoints.length >= 2) {
+        polyline = L.polyline(waypoints, {
+            color: '#4a7cf7',
+            weight: 4,
+            opacity: 0.85,
+            dashArray: null,
+        }).addTo(map);
+    }
 
     waypoints.forEach((pt, i) => {
         const icon = L.divIcon({
             className: 'waypoint-marker',
-            html: `${i + 1}`,
+            html: ' ',
             iconSize: [12, 12],
             iconAnchor: [6, 6],
         });
@@ -320,6 +324,13 @@ map.on('click', (e) => {
         setStatus(`Speed point "${label}" added (${formatSpeed(speed)})`, '');
         return;
     }
+    if (isAddingCustomPoints) {
+        const label = document.getElementById('customLabel').value.trim() || 'Custom point';
+        customPoints.push({ latlng: e.latlng, label });
+        renderCustomPoints();
+        setStatus(`Custom point "${label}" added`, '');
+        return;
+    }
     waypoints.push(e.latlng);
     redrawPath();
     updateInfo();
@@ -363,8 +374,10 @@ btnClear.addEventListener('click', () => {
     waypoints = [];
     scheduledStops = [];
     speedPoints = [];
+    customPoints = [];
     renderScheduledStops();
     renderSpeedPoints();
+    renderCustomPoints();
     redrawPath();
     updateInfo();
     updateStartButton();
@@ -412,10 +425,12 @@ chkFollow.addEventListener('change', () => {
 chkLabels.addEventListener('change', () => {
     renderScheduledStops();
     renderSpeedPoints();
+    renderCustomPoints();
 });
 
 const scheduledStopList = document.getElementById('scheduledStopList');
 const speedPointList = document.getElementById('speedPointList');
+const customPointList = document.getElementById('customPointList');
 const combinedNavList = document.getElementById('combinedNavList');
 
 function renderNavList() {
@@ -506,6 +521,40 @@ speedPointList.addEventListener('click', (e) => {
         const i = parseInt(del.dataset.index);
         speedPoints.splice(i, 1);
         renderSpeedPoints();
+    }
+});
+
+function renderCustomPoints() {
+    customPointMarkers.forEach(m => map.removeLayer(m));
+    customPointMarkers = [];
+    customPointList.innerHTML = customPoints.map((s, i) => {
+        return `<div style="padding:2px 0;border-bottom:1px solid #1a2a4e;display:flex;justify-content:space-between;align-items:center">
+            <span><span style="color:#9b59b6">\u25cf</span> ${s.label}</span>
+            <span class="del-custom" data-index="${i}" style="color:#e74c3c;cursor:pointer;font-size:14px;font-weight:700;line-height:1">\u00d7</span>
+        </div>`;
+    }).join('');
+    customPoints.forEach(s => {
+        const m = L.circleMarker(s.latlng, {
+            radius: 8,
+            color: '#fff',
+            weight: 2,
+            fillColor: '#9b59b6',
+            fillOpacity: 1,
+            zIndexOffset: 600,
+        }).addTo(map);
+        if (chkLabels.checked) {
+            m.bindTooltip(s.label, { permanent: true, direction: 'top', offset: [0, -4] });
+        }
+        customPointMarkers.push(m);
+    });
+}
+
+customPointList.addEventListener('click', (e) => {
+    const del = e.target.closest('.del-custom');
+    if (del) {
+        const i = parseInt(del.dataset.index);
+        customPoints.splice(i, 1);
+        renderCustomPoints();
     }
 });
 
@@ -807,7 +856,7 @@ btnPause.addEventListener('click', () => {
 
 btnStop.addEventListener('click', () => {
     stopAnimation();
-    elSpeed.value = 1.7;
+    elSpeed.value = speedUnit() === 'mph' ? 1.0 : 1.7;
     setStatus('Movement stopped', '');
     updateStartButton();
 });
@@ -845,9 +894,11 @@ document.querySelectorAll('.mode-btn').forEach(btn => {
         btn.style.background = 'rgba(74,124,247,.2)';
         isAddingStops = btn.dataset.mode === 'stop';
         isAddingSpeedPoints = btn.dataset.mode === 'speed';
+        isAddingCustomPoints = btn.dataset.mode === 'custom';
         document.getElementById('stopInputs').style.display = btn.dataset.mode === 'stop' ? 'block' : 'none';
         document.getElementById('speedInputs').style.display = btn.dataset.mode === 'speed' ? 'block' : 'none';
-        const msgs = { waypoint: 'Click to add waypoints', stop: 'Click on route to place a stop', speed: 'Click on route to place a speed point' };
+        document.getElementById('customInputs').style.display = btn.dataset.mode === 'custom' ? 'block' : 'none';
+        const msgs = { waypoint: 'Click to add waypoints', stop: 'Click on route to place a stop', speed: 'Click on route to place a speed point', custom: 'Click on the map to place a custom point' };
         setStatus(msgs[btn.dataset.mode], '');
     });
 });
@@ -919,7 +970,8 @@ document.getElementById('btnSave').addEventListener('click', () => {
     routes[name] = {
         waypoints: waypoints.map(p => ({ lat: p.lat, lng: p.lng })),
         stops: scheduledStops.map(s => ({ lat: s.latlng.lat, lng: s.latlng.lng, label: s.label, duration: s.duration })),
-        speedPoints: speedPoints.map(sp => ({ lat: sp.latlng.lat, lng: sp.latlng.lng, label: sp.label, speed: sp.speed }))
+        speedPoints: speedPoints.map(sp => ({ lat: sp.latlng.lat, lng: sp.latlng.lng, label: sp.label, speed: sp.speed })),
+        customPoints: customPoints.map(cp => ({ lat: cp.latlng.lat, lng: cp.latlng.lng, label: cp.label }))
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(routes));
     populateRouteSelect();
@@ -951,10 +1003,14 @@ document.getElementById('btnLoad').addEventListener('click', () => {
         const pt = L.latLng(sp.lat, sp.lng);
         return { latlng: pt, label: sp.label, speed: sp.speed, activated: false, routeDist: getRouteDistance(pt) };
     }) : [];
+    customPoints = data.customPoints ? data.customPoints.map(cp => {
+        return { latlng: L.latLng(cp.lat, cp.lng), label: cp.label };
+    }) : [];
     sortByRoute(scheduledStops);
     sortByRoute(speedPoints);
     renderScheduledStops();
     renderSpeedPoints();
+    renderCustomPoints();
     updateInfo();
     updateStartButton();
     map.fitBounds(L.latLngBounds(waypoints), { padding: [50, 50] });
