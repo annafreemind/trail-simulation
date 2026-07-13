@@ -47,7 +47,7 @@ let first112CallShown = false;
 let alarmTriggered = false;
 const ALARM_TIMES = [
     { h: 16, m: 39, label: 'First 112 call' },
-    { h: 16, m: 44, label: 'Second 112 call' },
+    { h: 16, m: 51, label: 'Second 112 call' },
 ];
 let _112Fired = {};
 let _112Points = [];
