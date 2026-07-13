@@ -45,7 +45,13 @@ let followMode = false;
 let isAtEnd = false;
 let first112CallShown = false;
 let alarmTriggered = false;
-const ALARM_TIME = { h: 16, m: 39 };
+const ALARM_TIMES = [
+    { h: 16, m: 39, label: 'First 112 call' },
+    { h: 16, m: 44, label: 'Second 112 call' },
+];
+let _112Fired = {};
+let _112Points = [];
+let _112PointMarkers = [];
 let scheduledStops = [];
 let scheduledStopMarkers = [];
 let isAddingStops = false;
@@ -76,6 +82,13 @@ const topoLayer = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png'
     maxZoom: 17,
     attribution: '&copy; <a href="https://opentopomap.org">OpenTopoMap</a> contributors',
 });
+topoLayer.on('tileerror', (e) => {
+    // retry failed tiles once
+    if (!e.tile._retried) {
+        e.tile._retried = true;
+        setTimeout(() => e.tile.src = e.tile.src, 500);
+    }
+});
 
 let currentLayer = osmLayer;
 
@@ -88,6 +101,9 @@ document.getElementById('mapLayer').addEventListener('change', function() {
         map.removeLayer(currentLayer);
         osmLayer.addTo(map);
         currentLayer = osmLayer;
+    }
+    if (waypoints.length >= 2) {
+        map.fitBounds(L.latLngBounds(waypoints), { padding: [50, 50] });
     }
 });
 
@@ -571,15 +587,39 @@ btnFit.addEventListener('click', () => {
     }
 });
 
-function showAlarm() {
+function showAlarm(text) {
     const el = document.getElementById('alarm');
+    el.textContent = text;
+    el.style.opacity = '1';
     el.style.display = 'block';
+    setTimeout(() => { el.style.opacity = '0'; }, 10000);
+    setTimeout(() => { el.style.display = 'none'; }, 11000);
 }
 
 function hideAlarm() {
     const el = document.getElementById('alarm');
     el.style.display = 'none';
     first112CallShown = false;
+}
+
+function render112Points() {
+    _112PointMarkers.forEach(m => map.removeLayer(m));
+    _112PointMarkers = [];
+    const chkLabels = document.getElementById('chkLabels');
+    _112Points.forEach(p => {
+        const m = L.circleMarker(p.latlng, {
+            radius: 10,
+            color: '#e74c3c',
+            weight: 3,
+            fillColor: '#e74c3c',
+            fillOpacity: 1,
+            zIndexOffset: 900,
+        }).addTo(map);
+        if (chkLabels.checked) {
+            m.bindTooltip(p.label, { permanent: true, direction: 'top', offset: [0, -6] });
+        }
+        _112PointMarkers.push(m);
+    });
 }
 
 // ============================================================
@@ -600,6 +640,11 @@ function stopAnimation() {
     isAtEnd = false;
     completedAnimation = false;
     alarmTriggered = false;
+    _112Fired = {};
+    _112PointMarkers.forEach(m => map.removeLayer(m));
+    _112Points = [];
+    _112PointMarkers = [];
+    first112CallShown = false;
     traveledDistanceKm = 0;
     simElapsedSeconds = 0;
     btnStart.disabled = waypoints.length < 2;
@@ -705,28 +750,6 @@ function animationLoop(timestamp) {
 
     simElapsedSeconds += delta * multiplier;
 
-    // Check 112 alarm
-    if (document.getElementById('chk112').checked && !alarmTriggered && !first112CallShown) {
-        const st = getStartDateTime();
-        if (st) {
-            const current = new Date(st.getTime() + simElapsedSeconds * 1000);
-            if (current.getHours() > ALARM_TIME.h || (current.getHours() === ALARM_TIME.h && current.getMinutes() >= ALARM_TIME.m)) {
-                first112CallShown = true;
-                alarmTriggered = true;
-                showAlarm();
-                infoCurrentSpeed.textContent = '0 ' + speedUnit();
-                setStatus('112 call — movement stopped', 'error');
-            }
-        }
-    }
-
-    if (alarmTriggered) {
-        updateTimerDisplay(simElapsedSeconds);
-        updateCurrentTime(simElapsedSeconds);
-        animationId = requestAnimationFrame(animationLoop);
-        return;
-    }
-
     // Scheduled stop wait — timer keeps running, marker stays
     if (activeStopIndex >= 0) {
         stopRemaining -= delta * multiplier;
@@ -749,6 +772,24 @@ function animationLoop(timestamp) {
     const pos = getPositionAtDistance(pts, traveledDistanceKm);
     movingMarker.setLatLng(pos);
     if (document.getElementById('chkFollow').checked) map.panTo(pos, { animate: false });
+
+    // Check 112 alarms
+    if (document.getElementById('chk112').checked) {
+        const st = getStartDateTime();
+        if (st) {
+            const current = new Date(st.getTime() + simElapsedSeconds * 1000);
+            for (const at of ALARM_TIMES) {
+                if (_112Fired[at.label]) continue;
+                if (current.getHours() > at.h || (current.getHours() === at.h && current.getMinutes() >= at.m)) {
+                    _112Fired[at.label] = true;
+                    _112Points.push({ latlng: pos, label: at.label });
+                    render112Points();
+                    showAlarm(at.label);
+                    setStatus(`${at.label} triggered`, 'error');
+                }
+            }
+        }
+    }
 
     // Check scheduled stops
     if (activeStopIndex < 0 && traveledDistanceKm > 0) {

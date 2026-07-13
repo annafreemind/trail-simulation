@@ -1,55 +1,93 @@
-# Generates pre-graded lighting keyframes of the trail photo for the sun view widget.
-# Realistic dusk/night: tone curve (shadows die first, sky holes persist),
-# Purkinje shift (blue-gray night vision), desaturation, slight blur at night.
+# Generates pre-graded lighting keyframes using YCbCr luminance channel,
+# proper Kelvin-based color temperature tint, and realistic grain at night.
 # Usage: python3 make_keyframes.py
 
-from PIL import Image, ImageEnhance, ImageFilter
+from PIL import Image, ImageFilter
+import numpy as np
 
 SRC = 'images/trail.jpg'
 MAX_W = 800
 
-# name, brightness, gamma, saturation, white-balance (r,g,b), blur radius
+# (name, kelvin, brightness, gamma, blur, grain_strength)
 KEYFRAMES = [
-    # bright day — original look
-    ('kf_day',    1.00, 1.00, 1.00, (1.00, 1.00, 1.00), 0),
-    # sun low (~20 deg) — softer, slightly warm
-    ('kf_low',    0.80, 1.05, 1.00, (1.04, 1.00, 0.94), 0),
-    # golden hour (~8 deg) — warm gold, shadows deepen
-    ('kf_golden', 0.55, 1.18, 0.95, (1.12, 1.00, 0.80), 0),
-    # sunset (~0 deg) — orange, dark, crushed shadows
-    ('kf_sunset', 0.34, 1.38, 0.85, (1.18, 0.95, 0.72), 0),
-    # civil twilight (~-4 deg) — blue-gray, highlights only
-    ('kf_civil',  0.16, 1.60, 0.45, (0.80, 0.90, 1.20), 1),
-    # nautical dusk (~-8 deg) — dark blue, sky holes still visible
-    ('kf_dusk',   0.07, 1.85, 0.30, (0.65, 0.80, 1.30), 2),
-    # night (~-14 deg) — near black, faint blue glimmers
-    ('kf_night',  0.028, 2.10, 0.15, (0.55, 0.75, 1.40), 3),
+    ('kf_day',    6500,  1.000,  1.00, 0,   0),
+    ('kf_low',    5500,  0.80,   1.05, 0,   0),
+    ('kf_golden', 3800,  0.55,   1.15, 0,   0),
+    ('kf_sunset', 2800,  0.34,   1.30, 0,   0),
+    ('kf_civil',  7500,  0.16,   1.50, 1,   5),
+    ('kf_dusk',   9000,  0.07,   1.70, 2,  12),
+    ('kf_night', 12000,  0.028,  2.00, 3,  25),
 ]
 
 
-def grade(img, brightness, gamma, saturation, wb, blur):
-    out = ImageEnhance.Color(img).enhance(saturation)
+def kelvin_to_rgb(temp):
+    """Approximate Planckian blackbody curve → RGB multipliers (0..1)."""
+    temp = max(1000, min(40000, temp))
+    if temp <= 6600:
+        r = 255.0
+        g = 99.4708025861 * np.log(temp / 100 - 2) - 161.1195681661
+    else:
+        r = 329.698727446 * ((temp / 100 - 60) ** -0.1332047592)
+        g = 288.1221695283 * ((temp / 100 - 60) ** -0.0755148492)
+    if temp >= 6600:
+        b = 255.0
+    elif temp <= 1900:
+        b = 0.0
+    else:
+        b = 138.5177312231 * np.log(temp / 100 - 10) - 305.0447927307
+    return np.clip(np.array([r, g, b]) / 255.0, 0, 1)
 
-    luts = []
-    for c in range(3):
-        lut = []
-        for v in range(256):
-            x = v / 255.0
-            y = (x ** gamma) * brightness * wb[c]
-            lut.append(max(0, min(255, round(y * 255))))
-        luts.append(lut)
-    out = out.point(luts[0] + luts[1] + luts[2])
 
-    if blur > 0:
-        out = out.filter(ImageFilter.GaussianBlur(blur))
-    return out
+NEUTRAL_RGB = kelvin_to_rgb(6500)
+
+
+def apply_tint(rgb_arr, kelvin):
+    """Multiply RGB by the tint ratio relative to D65 neutral."""
+    tint = kelvin_to_rgb(kelvin) / NEUTRAL_RGB
+    out = rgb_arr.astype(np.float32) * tint.reshape(1, 1, 3)
+    return np.clip(out, 0, 255).astype(np.uint8)
+
+
+def add_luma_grain(y_arr, strength):
+    """Random noise on luma channel only."""
+    noise = np.random.randint(-strength, strength + 1, y_arr.shape, dtype=np.int16)
+    return np.clip(y_arr.astype(np.int16) + noise, 0, 255).astype(np.uint8)
 
 
 img = Image.open(SRC).convert('RGB')
 if img.width > MAX_W:
     img = img.resize((MAX_W, round(img.height * MAX_W / img.width)), Image.LANCZOS)
 
-for name, brightness, gamma, saturation, wb, blur in KEYFRAMES:
-    graded = grade(img, brightness, gamma, saturation, wb, blur)
-    graded.save(f'images/{name}.jpg', quality=82)
-    print(f'{name}.jpg')
+img_ycc = img.convert('YCbCr')
+ycc_arr = np.array(img_ycc, dtype=np.float32)
+
+for name, kelvin, brightness, gamma, blur, grain in KEYFRAMES:
+    out_ycc = ycc_arr.copy()
+
+    # Gamma + brightness on Y (luma) channel only — shadows die first
+    y = out_ycc[:, :, 0] / 255.0
+    y = (y ** gamma) * brightness
+    y = (y / y.max()) * 255.0 if y.max() > 0 else y * 255.0
+    out_ycc[:, :, 0] = np.clip(y, 0, 255)
+
+    # Back to RGB
+    out = Image.fromarray(out_ycc.astype(np.uint8), 'YCbCr').convert('RGB')
+
+    # Kelvin-based tint on RGB
+    rgb_arr = np.array(out, dtype=np.uint8)
+    rgb_arr = apply_tint(rgb_arr, kelvin)
+
+    # Blur
+    if blur > 0:
+        rgb_arr = np.array(Image.fromarray(rgb_arr).filter(ImageFilter.GaussianBlur(blur)))
+
+    # Grain on luma only (extract Y, add noise, put back)
+    if grain > 0:
+        y_grain = np.array(Image.fromarray(rgb_arr).convert('YCbCr'), dtype=np.uint8)[:, :, 0]
+        y_grain = add_luma_grain(y_grain, grain)
+        rgb_ycc = np.array(Image.fromarray(rgb_arr).convert('YCbCr'))
+        rgb_ycc[:, :, 0] = y_grain
+        rgb_arr = np.array(Image.fromarray(rgb_ycc, 'YCbCr').convert('RGB'))
+
+    Image.fromarray(rgb_arr).save(f'images/{name}.jpg', quality=85)
+    print(f'images/{name}.jpg')
