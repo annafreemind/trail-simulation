@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Trail Simulation
 
 A single-page web application for drawing routes on an OpenStreetMap map and simulating movement along them with scheduled stops, speed changes, and time tracking.
