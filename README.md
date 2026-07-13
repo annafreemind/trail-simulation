@@ -10,6 +10,10 @@ Built with [Leaflet](https://leafletjs.com) and OpenStreetMap tiles.
 - **Animation** — move a marker along the route with configurable speed and time acceleration (1×–150×)
 - **Scheduled stops** — place stop points on the route with a duration in MM:SS format; the marker pauses automatically when it arrives. Default label `Stopover N`, default duration `02:00`. Orange markers indicate stops; passed stops turn semi-transparent
 - **Speed change points** — place speed points on the route; the speed changes when the marker reaches the point. Default label `Speed change N`, default speed 1.7 km/h. Green markers indicate speed points
+- **Speed units** — switch between km/h and mph; distance display and all speed labels convert automatically
+- **Point labels** — toggle permanent labels on stop and speed change point markers from the sidebar
+- **Map layers** — switch between OpenStreetMap and OpenTopoMap (shows elevation contours)
+- **POI markers** — predefined points of interest (Kris shorts, Backpack) displayed as transparent circles with red outlines and permanent labels
 - **Reverse direction** — toggle direction mid-animation
 - **Follow mode** — automatically pan the map with the marker during animation
 - **112 alarm** — configurable notification that triggers at 16:39; timer continues running, marker stops
@@ -49,9 +53,9 @@ Built with [Leaflet](https://leafletjs.com) and OpenStreetMap tiles.
 
 ### Navigation tab
 
-1. Set the start time, speed (km/h), and time acceleration (1×–150×)
+1. Set the start time, speed and unit (km/h or mph), and time acceleration (1×–150×)
 2. Click **Start** to begin animation
-3. Use **Pause** / **Stop** to control movement
+3. Use **Pause** / **Stop** to control movement; **Stop** resets speed to default
 4. **Reverse direction** flips the route mid-animation
 5. The lists at the bottom show all scheduled stops and speed points in a single scrollable list sorted by route position, with real-time status: unvisited points show their duration/speed, passed stops show their start and end times
 

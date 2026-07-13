@@ -107,6 +107,15 @@ L.circleMarker([8.878563, -82.408597], {
     zIndexOffset: 500,
 }).addTo(map).bindTooltip('Kris shorts', { permanent: true, direction: 'top', offset: [0, -4] });
 
+L.circleMarker([8.91823, -82.41274], {
+    radius: 14,
+    color: '#e74c3c',
+    weight: 2,
+    fillColor: 'transparent',
+    fillOpacity: 0,
+    zIndexOffset: 500,
+}).addTo(map).bindTooltip('Backpack', { permanent: true, direction: 'top', offset: [0, -4] });
+
 // ============================================================
 //   Helpers
 // ============================================================
