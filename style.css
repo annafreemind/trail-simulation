@@ -240,6 +240,57 @@ body {
     height: 100%;
 }
 
+#sunView {
+    position: fixed;
+    bottom: 12px;
+    right: 12px;
+    z-index: 10000;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-radius: 8px;
+    background: #1a1a2e;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+    cursor: default;
+    pointer-events: none;
+    transition: opacity .3s, transform .3s;
+}
+
+#sunViewToggle {
+    position: fixed;
+    bottom: 316px;
+    right: 12px;
+    z-index: 10001;
+    width: 22px;
+    height: 22px;
+    background: #16213e;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-bottom: none;
+    border-radius: 6px 6px 0 0;
+    color: #8899bb;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background .2s, color .2s;
+    user-select: none;
+    line-height: 1;
+}
+#sunViewToggle:hover {
+    background: #2a3a5e;
+    color: #f0f4ff;
+}
+
+#sunView.hidden {
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(10px);
+}
+#sunView.hidden ~ #sunViewToggle {
+    bottom: 12px;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-radius: 6px;
+}
+
 /* Custom Leaflet overrides */
 .leaflet-container {
     background: #1a1a2e;

@@ -824,6 +824,7 @@ function updateCurrentTime(elapsedSec) {
     if (startDate) {
         const currentDate = new Date(startDate.getTime() + elapsedSec * 1000);
         infoCurrentTime.textContent = formatTime(currentDate);
+        updateSunView(currentDate);
     } else {
         infoCurrentTime.textContent = '—';
     }
@@ -1029,3 +1030,226 @@ if (elSpeedUnit.value === 'mph') {
 }
 
 console.log('Trail Animator ready — click the map to start!');
+
+// ============================================================
+//   Sun view — trail photo lighting simulation
+//   Pre-graded keyframes (make_keyframes.py) cross-faded by sun elevation.
+//   Photo taken at 13:20 (sun elevation ~78°) — reference brightness.
+// ============================================================
+const sunCanvas = document.getElementById('sunView');
+const sunCtx = sunCanvas.getContext('2d');
+let lastSunBucket = -1;
+
+const sunKeyframes = [
+    { elev: -14, src: 'images/kf_night.jpg' },
+    { elev: -8, src: 'images/kf_dusk.jpg' },
+    { elev: -4, src: 'images/kf_civil.jpg' },
+    { elev: 0, src: 'images/kf_sunset.jpg' },
+    { elev: 8, src: 'images/kf_golden.jpg' },
+    { elev: 20, src: 'images/kf_low.jpg' },
+    { elev: 50, src: 'images/kf_day.jpg' },
+];
+sunKeyframes.forEach(kf => {
+    kf.img = new Image();
+    kf.img.src = kf.src;
+    kf.img.onload = refreshSunView;
+});
+
+function getSunAt(date) {
+    const idx = date.getHours() * 12 + Math.floor(date.getMinutes() / 5);
+    const row = sunData.table[idx];
+    return row ? { elev: row[2], azim: row[3] } : null;
+}
+
+function drawKeyframe(img, alpha) {
+    if (!img.complete || !img.naturalWidth) return;
+    const W = sunCanvas.width, H = sunCanvas.height;
+    const scale = Math.max(W / img.naturalWidth, H / img.naturalHeight);
+    const dw = img.naturalWidth * scale;
+    const dh = img.naturalHeight * scale;
+    sunCtx.globalAlpha = alpha;
+    sunCtx.drawImage(img, (W - dw) / 2, (H - dh) / 2, dw, dh);
+    sunCtx.globalAlpha = 1;
+}
+
+function drawSunView(date) {
+    const sun = getSunAt(date);
+    if (!sun) return;
+    const W = sunCanvas.width, H = sunCanvas.height;
+    const kfs = sunKeyframes;
+    const elev = Math.max(kfs[0].elev, Math.min(kfs[kfs.length - 1].elev, sun.elev));
+
+    // interpolate keyframes
+    let i = 0;
+    while (i < kfs.length - 2 && elev > kfs[i + 1].elev) i++;
+    const a = kfs[i], b = kfs[i + 1];
+    const t = Math.max(0, Math.min(1, (elev - a.elev) / (b.elev - a.elev)));
+
+    sunCtx.clearRect(0, 0, W, H);
+
+    // photo on left 62%
+    const photoW = Math.floor(W * 0.62);
+    sunCtx.save();
+    sunCtx.beginPath();
+    sunCtx.rect(0, 0, photoW, H);
+    sunCtx.clip();
+    drawKeyframe(a.img, 1);
+    if (t > 0) drawKeyframe(b.img, t);
+    sunCtx.restore();
+
+    // ---- schematic on right 38% ----
+    const sx = photoW;
+    const sw = W - sx;
+    const sh = H;
+    const cx = sx + sw / 2;          // center x
+    const horizonY = sh * 0.58;       // horizon y
+    const arcR = sh * 0.42;           // sky radius (90° = top)
+    const azimLeft = 80, azimRight = 280;
+
+    // background
+    sunCtx.fillStyle = 'rgba(10,18,35,0.82)';
+    sunCtx.fillRect(sx, 0, sw, sh);
+
+    // ground fill
+    sunCtx.fillStyle = 'rgba(40,55,40,0.5)';
+    sunCtx.fillRect(sx, horizonY, sw, sh - horizonY);
+
+    // elevation arcs
+    sunCtx.strokeStyle = 'rgba(255,255,255,0.15)';
+    sunCtx.lineWidth = 1;
+    [30, 60].forEach(deg => {
+        const r = arcR * (deg / 90);
+        sunCtx.beginPath();
+        sunCtx.arc(cx, horizonY, r, -Math.PI, 0);
+        sunCtx.stroke();
+        // label
+        sunCtx.fillStyle = 'rgba(255,255,255,0.2)';
+        sunCtx.font = '9px sans-serif';
+        sunCtx.fillText(`${deg}\u00b0`, cx + r + 2, horizonY - 2);
+    });
+
+    // horizon line
+    sunCtx.strokeStyle = 'rgba(255,255,255,0.5)';
+    sunCtx.lineWidth = 1;
+    sunCtx.beginPath();
+    sunCtx.moveTo(sx, horizonY);
+    sunCtx.lineTo(sx + sw, horizonY);
+    sunCtx.stroke();
+
+    // mountain silhouette (1500m away, assumed ~300m rise → ~12°)
+    const mtnWidth = sw * 0.38;
+    const mtnHeight = arcR * 0.22; // ~12°
+    const mtnX = cx - mtnWidth / 2 + sw * 0.08;
+    sunCtx.fillStyle = 'rgba(60,75,60,0.85)';
+    sunCtx.beginPath();
+    sunCtx.moveTo(mtnX - mtnWidth / 2, horizonY);
+    sunCtx.lineTo(mtnX, horizonY - mtnHeight);
+    sunCtx.lineTo(mtnX + mtnWidth / 2, horizonY);
+    sunCtx.closePath();
+    sunCtx.fill();
+    // ridge line
+    sunCtx.strokeStyle = 'rgba(120,140,100,0.5)';
+    sunCtx.lineWidth = 1.5;
+    sunCtx.beginPath();
+    sunCtx.moveTo(mtnX - mtnWidth / 2, horizonY);
+    sunCtx.lineTo(mtnX, horizonY - mtnHeight);
+    sunCtx.lineTo(mtnX + mtnWidth / 2, horizonY);
+    sunCtx.stroke();
+    // vertical distance line: ground → peak
+    sunCtx.strokeStyle = 'rgba(255,255,255,0.3)';
+    sunCtx.lineWidth = 1;
+    sunCtx.setLineDash([3, 3]);
+    sunCtx.beginPath();
+    sunCtx.moveTo(mtnX + mtnWidth / 2 + 8, horizonY);
+    sunCtx.lineTo(mtnX + mtnWidth / 2 + 8, horizonY - mtnHeight);
+    sunCtx.stroke();
+    sunCtx.setLineDash([]);
+    // arrow tips
+    sunCtx.fillStyle = 'rgba(255,255,255,0.3)';
+    sunCtx.beginPath();
+    sunCtx.moveTo(mtnX + mtnWidth / 2 + 4, horizonY - 2);
+    sunCtx.lineTo(mtnX + mtnWidth / 2 + 8, horizonY);
+    sunCtx.lineTo(mtnX + mtnWidth / 2 + 12, horizonY - 2);
+    sunCtx.fill();
+    sunCtx.beginPath();
+    sunCtx.moveTo(mtnX + mtnWidth / 2 + 4, horizonY - mtnHeight + 2);
+    sunCtx.lineTo(mtnX + mtnWidth / 2 + 8, horizonY - mtnHeight);
+    sunCtx.lineTo(mtnX + mtnWidth / 2 + 12, horizonY - mtnHeight + 2);
+    sunCtx.fill();
+    // "1500m" label
+    sunCtx.fillStyle = 'rgba(255,255,255,0.4)';
+    sunCtx.font = '9px sans-serif';
+    sunCtx.textAlign = 'left';
+    sunCtx.fillText('1500m', mtnX + mtnWidth / 2 + 11, horizonY - mtnHeight / 2 + 3);
+
+    // sun position (azimuth: left=W~280°, right=E~80°)
+    const azimFrac = 1 - (sun.azim - azimLeft) / (azimRight - azimLeft);
+    const sunX = sx + azimFrac * sw;
+    const sunY = horizonY - arcR * Math.max(-1, Math.min(1, sun.elev / 90));
+    const isNight = sun.elev < 0;
+    const sunR = isNight ? 5 : 7;
+    const sunColor = isNight ? 'rgba(200,200,220,0.3)' : '#ffe066';
+    const glowColor = isNight ? 'rgba(200,200,220,0.05)' : 'rgba(255,230,100,0.35)';
+
+    // glow
+    sunCtx.beginPath();
+    sunCtx.arc(sunX, sunY, sunR * 3, 0, Math.PI * 2);
+    sunCtx.fillStyle = glowColor;
+    sunCtx.fill();
+
+    // sun body
+    sunCtx.beginPath();
+    sunCtx.arc(sunX, sunY, sunR, 0, Math.PI * 2);
+    sunCtx.fillStyle = sunColor;
+    sunCtx.fill();
+
+    // night: dashed arc below horizon
+    if (isNight) {
+        sunCtx.setLineDash([2, 3]);
+        sunCtx.strokeStyle = 'rgba(200,200,220,0.2)';
+        sunCtx.lineWidth = 1;
+        sunCtx.beginPath();
+        sunCtx.arc(cx, horizonY, arcR * (-sun.elev / 90), -Math.PI, 0);
+        sunCtx.stroke();
+        sunCtx.setLineDash([]);
+    }
+
+    // labels
+    sunCtx.fillStyle = 'rgba(255,255,255,0.4)';
+    sunCtx.font = '9px sans-serif';
+    sunCtx.textAlign = 'center';
+    sunCtx.fillText('W', sx + 4, horizonY + 13);
+    sunCtx.fillText('E', sx + sw - 4, horizonY + 13);
+    sunCtx.textAlign = 'left';
+
+    // caption bar
+    const timeStr = `${String(date.getHours()).padStart(2, '0')}:${String(Math.floor(date.getMinutes() / 5) * 5).padStart(2, '0')}`;
+    sunCtx.fillStyle = 'rgba(0,0,0,0.55)';
+    sunCtx.fillRect(0, H - 32, W, 32);
+    sunCtx.fillStyle = '#fff';
+    sunCtx.font = '13px -apple-system, sans-serif';
+    sunCtx.textBaseline = 'middle';
+    sunCtx.fillText(`${timeStr}  ·  sun ${sun.elev.toFixed(1)}\u00b0`, 10, H - 16);
+}
+
+function updateSunView(date, force) {
+    if (!date) return;
+    const bucket = date.getHours() * 12 + Math.floor(date.getMinutes() / 5);
+    if (!force && bucket === lastSunBucket) return;
+    lastSunBucket = bucket;
+    drawSunView(date);
+}
+
+function refreshSunView() {
+    const st = getStartDateTime();
+    if (st) updateSunView(new Date(st.getTime() + simElapsedSeconds * 1000), true);
+}
+
+elStartTime.addEventListener('input', refreshSunView);
+
+// Toggle sun widget
+document.getElementById('sunViewToggle').addEventListener('click', function () {
+    const canvas = document.getElementById('sunView');
+    canvas.classList.toggle('hidden');
+    this.textContent = canvas.classList.contains('hidden') ? '+' : '\u2212';
+});
