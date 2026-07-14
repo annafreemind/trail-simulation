@@ -53,6 +53,7 @@ let _112Fired = {};
 let _112Points = [];
 let _112PointMarkers = [];
 let _prevSimSec = -1;
+let _smoothViewDir = 0;
 let scheduledStops = [];
 let scheduledStopMarkers = [];
 let isAddingStops = false;
@@ -64,6 +65,14 @@ let isAddingSpeedPoints = false;
 let customPoints = [];
 let customPointMarkers = [];
 let isAddingCustomPoints = false;
+
+// ============================================================
+//   Elevation state
+// ============================================================
+let routeElevationData = [];
+let elevationHistory = [];
+let _lastRecordedMinute = -1;
+let _elevTimer = null;
 
 // ============================================================
 //   Map
@@ -379,6 +388,7 @@ map.on('click', (e) => {
     updateInfo();
     updateStartButton();
     setStatus(`Waypoint ${waypoints.length} added`, '');
+    deferElevRefresh();
 });
 
 // ============================================================
@@ -418,6 +428,9 @@ btnClear.addEventListener('click', () => {
     scheduledStops = [];
     speedPoints = [];
     customPoints = [];
+    routeElevationData = [];
+    elevationHistory = [];
+    _lastRecordedMinute = -1;
     renderScheduledStops();
     renderSpeedPoints();
     renderCustomPoints();
@@ -427,6 +440,8 @@ btnClear.addEventListener('click', () => {
     resetTimerDisplay();
     infoCurrentTime.textContent = '—';
     infoCurrentSpeed.textContent = '—';
+    drawElevProfile();
+    document.getElementById('infoElevation').textContent = '—';
     setStatus('Route cleared. Click the map to start a new one', '');
 });
 
@@ -442,6 +457,7 @@ btnUndo.addEventListener('click', () => {
     updateInfo();
     updateStartButton();
     setStatus(waypoints.length ? 'Last point removed' : 'All points removed', '');
+    deferElevRefresh();
 });
 
 const btnReverse = document.getElementById('btnReverse');
@@ -675,6 +691,9 @@ function stopAnimation() {
     traveledDistanceKm = 0;
     simElapsedSeconds = 0;
     _prevSimSec = -1;
+    _smoothViewDir = 0;
+    _lastRecordedMinute = -1;
+    elevationHistory = [];
     btnStart.disabled = waypoints.length < 2;
     btnStart.textContent = 'Start';
     btnPause.disabled = true;
@@ -749,6 +768,7 @@ function startAnimation() {
     isAtEnd = false;
     alarmTriggered = false;
     _prevSimSec = -1;
+    _smoothViewDir = 0;
     isPlaying = true;
     isPaused = false;
     btnStart.disabled = true;
@@ -825,6 +845,15 @@ function animationLoop(timestamp) {
     }
     _prevSimSec = simElapsedSeconds;
 
+    // Record elevation every simulated minute
+    if (traveledDistanceKm > 0) {
+        const curMin = Math.floor(simElapsedSeconds / 60);
+        if (curMin > _lastRecordedMinute) {
+            _lastRecordedMinute = curMin;
+            elevationHistory.push({ dist: traveledDistanceKm, ele: getElevation(traveledDistanceKm), time: simElapsedSeconds });
+        }
+    }
+
     // Check scheduled stops
     if (activeStopIndex < 0 && traveledDistanceKm > 0) {
         for (let i = 0; i < scheduledStops.length; i++) {
@@ -872,6 +901,7 @@ function animationLoop(timestamp) {
     infoCurrentSpeed.textContent = formatSpeed(getSpeedKmh());
     updateTimerDisplay(simElapsedSeconds);
     updateCurrentTime(simElapsedSeconds);
+    drawElevProfile();
 
     if (isAtEnd) {
         animationId = requestAnimationFrame(animationLoop);
@@ -1047,6 +1077,12 @@ function loadRoute(name) {
     updateStartButton();
     map.fitBounds(L.latLngBounds(waypoints), { padding: [50, 50] });
     setStatus(`Route "${name}" loaded`, 'active');
+    if (data.elevationData && data.elevationData.length >= 2) {
+        routeElevationData = data.elevationData.map(d => ({ dist: d.dist, ele: d.ele }));
+        drawElevProfile();
+    } else {
+        refreshElevations();
+    }
 }
 
 function populateRouteList() {
@@ -1097,7 +1133,8 @@ document.getElementById('btnSave').addEventListener('click', () => {
         waypoints: waypoints.map(p => ({ lat: p.lat, lng: p.lng })),
         stops: scheduledStops.map(s => ({ lat: s.latlng.lat, lng: s.latlng.lng, label: s.label, duration: s.duration })),
         speedPoints: speedPoints.map(sp => ({ lat: sp.latlng.lat, lng: sp.latlng.lng, label: sp.label, speed: sp.speed })),
-        customPoints: customPoints.map(cp => ({ lat: cp.latlng.lat, lng: cp.latlng.lng, label: cp.label }))
+        customPoints: customPoints.map(cp => ({ lat: cp.latlng.lat, lng: cp.latlng.lng, label: cp.label })),
+        elevationData: routeElevationData.map(d => ({ dist: d.dist, ele: d.ele }))
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(routes));
     populateRouteList();
@@ -1126,9 +1163,41 @@ console.log('Trail Animator ready — click the map to start!');
 // ============================================================
 //   Sun view — horizon schematic with sun position
 //   Sun data: Boquete, Panama, April 1 2014 (sun_data.js)
+//   Sky colors: hand-tuned keyframes based on real sky references
 // ============================================================
 const sunCanvas = document.getElementById('sunView');
 const sunCtx = sunCanvas.getContext('2d');
+
+function lerp3(a, b, t) {
+    return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+}
+
+function skyColorAt(elev) {
+    const clamped = Math.max(-12, Math.min(50, elev));
+    const dayFactor = Math.max(0, Math.min(1, (clamped + 3) / 20));
+    const warmFactor = smoothstep(0, 12, Math.max(0, 12 - Math.abs(clamped)));
+    const warmth = warmFactor * (1 - dayFactor * 0.7);
+
+    const nightTop = [2, 2, 18];
+    const nightHor = [1, 1, 14];
+    const dayTop = [40, 110, 235];
+    const dayHor = [190, 210, 238];
+    const warmTop = [60, 40, 90];
+    const warmHor = [120, 60, 40];
+
+    let top = lerp3(nightTop, dayTop, dayFactor);
+    let hor = lerp3(nightHor, dayHor, dayFactor);
+
+    top = lerp3(top, warmTop, warmth * 0.5);
+    hor = lerp3(hor, warmHor, warmth);
+
+    return { top, hor };
+}
+
+function smoothstep(edge0, edge1, x) {
+    const t = Math.max(0, Math.min(1, (x - edge0) / (edge1 - edge0)));
+    return t * t * (3 - 2 * t);
+}
 
 function getSunAt(date) {
     const totalMin = date.getHours() * 60 + date.getMinutes() + date.getSeconds() / 60;
@@ -1168,6 +1237,18 @@ let viewDir = 0;
         viewDir = getBearingAtDistance(pts, traveledDistanceKm);
     }
         if (viewDir === -1) viewDir = 0;
+    // smooth heading rotation
+    if (isPlaying) {
+        let diff = viewDir - _smoothViewDir;
+        if (diff > 180) diff -= 360;
+        if (diff < -180) diff += 360;
+        _smoothViewDir += diff * 0.06;
+        if (_smoothViewDir < 0) _smoothViewDir += 360;
+        if (_smoothViewDir >= 360) _smoothViewDir -= 360;
+    } else {
+        _smoothViewDir = viewDir;
+    }
+    viewDir = _smoothViewDir;
     function card(a) { return ['N','E','S','W'][Math.round((a % 360) / 90) % 4]; }
     const leftAzim = (viewDir + 260) % 360;
     const rightAzim = (viewDir + 100) % 360;
@@ -1178,25 +1259,15 @@ let viewDir = 0;
         return (aa - la) / (ra + 360 - la);
     }
 
-    // sky colors — lookup from Hosek-Wilkie table, interpolate
-    const table = skyColorTable;
-    let idx = 0;
-    while (idx < table.length - 2 && elev > table[idx + 1].e) idx++;
-    const a = table[idx], b = table[idx + 1];
-    const tblT = Math.max(0, Math.min(1, (elev - a.e) / (b.e - a.e)));
-    const skyTop = [a.t[0] + (b.t[0] - a.t[0]) * tblT, a.t[1] + (b.t[1] - a.t[1]) * tblT, a.t[2] + (b.t[2] - a.t[2]) * tblT];
-    const skyHor = [a.h[0] + (b.h[0] - a.h[0]) * tblT, a.h[1] + (b.h[1] - a.h[1]) * tblT, a.h[2] + (b.h[2] - a.h[2]) * tblT];
-    // apply brightness envelope + directional factor
-    const br = Math.max(0.05, (elev + 12) / 62);
-    const bTop = [skyTop[0] * br, skyTop[1] * br, skyTop[2] * br];
-    const bHor = [skyHor[0] * br, skyHor[1] * br, skyHor[2] * br];
+    // sky colors — interpolate from hand-tuned keyframes
+    const { top: skyTop, hor: skyHor } = skyColorAt(elev);
 
     sunCtx.clearRect(0, 0, W, H);
 
     // gradient sky
     const grad = sunCtx.createLinearGradient(0, 0, 0, horizonY);
-    grad.addColorStop(0, rgb(bTop));
-    grad.addColorStop(1, rgb(bHor));
+    grad.addColorStop(0, rgb(skyTop));
+    grad.addColorStop(1, rgb(skyHor));
     sunCtx.fillStyle = grad;
     sunCtx.fillRect(0, 0, W, horizonY);
 
@@ -1248,11 +1319,12 @@ let viewDir = 0;
     sunCtx.shadowBlur = 0;
 
     // ground
-    sunCtx.fillStyle = 'rgba(40,55,40,0.5)';
+    const groundBr = Math.max(0, Math.min(1, (elev + 3) / 13));
+    sunCtx.fillStyle = `rgba(40,55,40,${0.5 * groundBr})`;
     sunCtx.fillRect(0, horizonY, W, sh - horizonY);
 
     // horizon line
-    sunCtx.strokeStyle = 'rgba(255,255,255,0.5)';
+    sunCtx.strokeStyle = `rgba(255,255,255,${0.5 * groundBr})`;
     sunCtx.lineWidth = 1;
     sunCtx.beginPath();
     sunCtx.moveTo(sx, horizonY);
@@ -1263,7 +1335,7 @@ let viewDir = 0;
     const mtnWidth = sw * 0.38;
     const mtnHeight = arcR * 0.22; // ~12°
     const mtnX = cx;
-    sunCtx.fillStyle = 'rgba(60,75,60,0.85)';
+    sunCtx.fillStyle = `rgba(60,75,60,${0.85 * groundBr})`;
     sunCtx.beginPath();
     sunCtx.moveTo(mtnX - mtnWidth / 2, horizonY);
     sunCtx.lineTo(mtnX, horizonY - mtnHeight);
@@ -1271,7 +1343,7 @@ let viewDir = 0;
     sunCtx.closePath();
     sunCtx.fill();
     // ridge line
-    sunCtx.strokeStyle = 'rgba(120,140,100,0.5)';
+    sunCtx.strokeStyle = `rgba(120,140,100,${0.5 * groundBr})`;
     sunCtx.lineWidth = 1.5;
     sunCtx.beginPath();
     sunCtx.moveTo(mtnX - mtnWidth / 2, horizonY);
@@ -1406,6 +1478,195 @@ document.getElementById('sunViewToggle').addEventListener('click', function () {
     container.classList.toggle('collapsed');
     this.textContent = container.classList.contains('collapsed') ? '▲' : '▼';
 });
+
+// Toggle elevation widget
+document.getElementById('elevViewToggle').addEventListener('click', function () {
+    const container = document.querySelector('.elev-controls');
+    container.classList.toggle('collapsed');
+    this.textContent = container.classList.contains('collapsed') ? '▲' : '▼';
+});
+
+// ============================================================
+//   Elevation profile
+// ============================================================
+const elevCanvas = document.getElementById('elevView');
+const elevCtx = elevCanvas.getContext('2d');
+
+async function refreshElevations() {
+    if (waypoints.length < 2) {
+        routeElevationData = [];
+        drawElevProfile();
+        return;
+    }
+    document.getElementById('elevInfo').textContent = 'Loading...';
+    document.getElementById('infoElevation').textContent = '…';
+    try {
+        const locations = waypoints.map(p => ({ latitude: p.lat, longitude: p.lng }));
+        const res = await fetch('https://api.open-elevation.com/api/v1/lookup', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ locations })
+        });
+        const data = await res.json();
+        if (data && data.results && data.results.length === waypoints.length) {
+            routeElevationData = [];
+            let cumDist = 0;
+            routeElevationData.push({ dist: 0, ele: data.results[0].elevation });
+            for (let i = 1; i < waypoints.length; i++) {
+                cumDist += haversineKm(waypoints[i - 1], waypoints[i]);
+                routeElevationData.push({ dist: cumDist, ele: data.results[i].elevation });
+            }
+            drawElevProfile();
+        } else {
+            drawElevProfile();
+        }
+    } catch (err) {
+        console.error('Elevation fetch error:', err);
+        if (routeElevationData.length >= 2) {
+            drawElevProfile();
+        } else {
+            document.getElementById('elevInfo').textContent = 'Failed';
+            document.getElementById('infoElevation').textContent = '—';
+        }
+    }
+}
+
+function deferElevRefresh() {
+    if (_elevTimer) clearTimeout(_elevTimer);
+    _elevTimer = setTimeout(() => { refreshElevations(); _elevTimer = null; }, 300);
+}
+
+function getElevation(distKm) {
+    if (!routeElevationData.length) return 0;
+    if (distKm <= 0) return routeElevationData[0].ele;
+    const last = routeElevationData[routeElevationData.length - 1];
+    if (distKm >= last.dist) return last.ele;
+    for (let i = 1; i < routeElevationData.length; i++) {
+        if (routeElevationData[i].dist >= distKm) {
+            const t = (distKm - routeElevationData[i - 1].dist) / (routeElevationData[i].dist - routeElevationData[i - 1].dist);
+            return routeElevationData[i - 1].ele + (routeElevationData[i].ele - routeElevationData[i - 1].ele) * t;
+        }
+    }
+    return last.ele;
+}
+
+function drawElevProfile() {
+    const W = elevCanvas.width, H = elevCanvas.height;
+    elevCtx.clearRect(0, 0, W, H);
+
+    if (routeElevationData.length < 2) {
+        elevCtx.fillStyle = '#0d1a2d';
+        elevCtx.fillRect(0, 0, W, H);
+        elevCtx.fillStyle = '#556688';
+        elevCtx.font = '13px sans-serif';
+        elevCtx.textAlign = 'center';
+        elevCtx.fillText('No elevation data', W / 2, H / 2 + 4);
+        document.getElementById('elevInfo').textContent = '';
+        return;
+    }
+
+    const pad = { top: 14, bottom: 22, left: 48, right: 12 };
+    const plotW = W - pad.left - pad.right;
+    const plotH = H - pad.top - pad.bottom;
+
+    const eles = routeElevationData.map(d => d.ele);
+    const minEle = Math.min(...eles);
+    const maxEle = Math.max(...eles);
+    const eleRange = Math.max(maxEle - minEle, 10);
+    const totalDist = routeElevationData[routeElevationData.length - 1].dist;
+
+    elevCtx.fillStyle = '#0d1a2d';
+    elevCtx.fillRect(0, 0, W, H);
+
+    // grid lines
+    elevCtx.strokeStyle = 'rgba(255,255,255,0.06)';
+    elevCtx.lineWidth = 1;
+    for (let i = 0; i <= 4; i++) {
+        const y = pad.top + plotH * i / 4;
+        elevCtx.beginPath();
+        elevCtx.moveTo(pad.left, y);
+        elevCtx.lineTo(W - pad.right, y);
+        elevCtx.stroke();
+    }
+
+    // Y labels
+    elevCtx.fillStyle = 'rgba(255,255,255,0.35)';
+    elevCtx.font = '10px sans-serif';
+    elevCtx.textAlign = 'right';
+    elevCtx.textBaseline = 'middle';
+    for (let i = 0; i <= 4; i++) {
+        const ele = maxEle - eleRange * i / 4;
+        const y = pad.top + plotH * i / 4;
+        if (y >= pad.top && y <= pad.top + plotH) {
+            elevCtx.fillText(Math.round(ele) + 'm', pad.left - 6, y);
+        }
+    }
+
+    // X labels
+    elevCtx.textAlign = 'center';
+    elevCtx.textBaseline = 'top';
+    for (let i = 0; i <= 4; i++) {
+        const dist = totalDist * i / 4;
+        const x = pad.left + plotW * i / 4;
+        elevCtx.fillStyle = 'rgba(255,255,255,0.35)';
+        elevCtx.fillText(formatDistance(dist), x, H - pad.bottom + 6);
+    }
+
+    // profile path
+    elevCtx.strokeStyle = '#4a7cf7';
+    elevCtx.lineWidth = 2;
+    elevCtx.beginPath();
+    for (let i = 0; i < routeElevationData.length; i++) {
+        const x = pad.left + (routeElevationData[i].dist / totalDist) * plotW;
+        const y = pad.top + plotH * (1 - (routeElevationData[i].ele - minEle) / eleRange);
+        if (i === 0) elevCtx.moveTo(x, y);
+        else elevCtx.lineTo(x, y);
+    }
+    elevCtx.stroke();
+
+    // fill under curve
+    const lastX = pad.left + plotW;
+    const baseY = pad.top + plotH;
+    elevCtx.fillStyle = 'rgba(74,124,247,0.08)';
+    elevCtx.lineTo(lastX, baseY);
+    elevCtx.lineTo(pad.left, baseY);
+    elevCtx.closePath();
+    elevCtx.fill();
+
+    // current position marker
+    if (isPlaying && totalDistanceKm > 0) {
+        const curDist = Math.min(traveledDistanceKm, totalDist);
+        const curX = pad.left + (curDist / totalDist) * plotW;
+        const curEle = getElevation(curDist);
+        const curY = pad.top + plotH * (1 - (curEle - minEle) / eleRange);
+
+        elevCtx.strokeStyle = 'rgba(255,255,255,0.15)';
+        elevCtx.lineWidth = 1;
+        elevCtx.setLineDash([3, 4]);
+        elevCtx.beginPath();
+        elevCtx.moveTo(curX, pad.top);
+        elevCtx.lineTo(curX, pad.top + plotH);
+        elevCtx.stroke();
+        elevCtx.setLineDash([]);
+
+        elevCtx.fillStyle = '#ffe066';
+        elevCtx.beginPath();
+        elevCtx.arc(curX, curY, 4, 0, Math.PI * 2);
+        elevCtx.fill();
+        elevCtx.strokeStyle = '#fff';
+        elevCtx.lineWidth = 1.5;
+        elevCtx.stroke();
+    }
+
+    // elevation info
+    const curEle = isPlaying ? getElevation(traveledDistanceKm) : (routeElevationData[0] ? routeElevationData[0].ele : 0);
+    document.getElementById('elevInfo').textContent = `${Math.round(curEle)}m  ·  max ${Math.round(maxEle)}m  ·  min ${Math.round(minEle)}m`;
+    const infoEl = document.getElementById('infoElevation');
+    if (infoEl) infoEl.textContent = `${Math.round(curEle)}m`;
+}
+
+// Initial draw
+drawElevProfile();
 
 // ============================================================
 //   Export / Import

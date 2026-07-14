@@ -115,6 +115,10 @@
                     <span class="label">Distance</span>
                     <span class="value" id="infoDistance">—</span>
                 </div>
+                <div class="info-row">
+                    <span class="label">Elevation</span>
+                    <span class="value" id="infoElevation">—</span>
+                </div>
             </div>
 
             <!-- ===== TAB: NAVIGATION ===== -->
@@ -184,6 +188,13 @@
              <div id="sunViewToggle" title="Toggle panel">▼</div>
            </div>
          </div>
+         <div class="elev-controls">
+            <canvas id="elevView" width="800" height="180"></canvas>
+           <div class="elev-caption">
+             <span class="elev-info" id="elevInfo">No elevation data</span>
+             <div id="elevViewToggle" title="Toggle elevation">▼</div>
+           </div>
+         </div>
         <div id="alarm" style="display:none;position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:10000;background:#5c1a1a;border:2px solid #e74c3c;border-radius:8px;padding:12px 24px;text-align:center;font-size:18px;font-weight:700;color:#ff6b6b;box-shadow:0 4px 20px rgba(0,0,0,.5);transition:opacity 1s ease">First 112 call</div>
     </div>
 
@@ -199,7 +210,6 @@
 
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="sun_data.js"></script>
-    <script src="sky_colors.js"></script>
     <script src="app.js"></script>
 </body>
 </html>
