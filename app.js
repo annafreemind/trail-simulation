@@ -555,8 +555,8 @@ function renderSpeedPoints() {
             radius: 8,
             color: '#fff',
             weight: 2,
-            fillColor: s.activated ? '#2ecc71' : '#f39c12',
-            fillOpacity: s.activated ? 0.5 : 1,
+            fillColor: '#2ecc71',
+            fillOpacity: s.activated ? 0.3 : 1,
             zIndexOffset: 600,
         }).addTo(map);
         if (chkLabels.checked) {
@@ -1927,7 +1927,16 @@ function drawElevProfile() {
     if (isPlaying && totalDistanceKm > 0) {
         const curDist = Math.min(traveledDistanceKm, totalDist);
         const curX = pad.left + (curDist / totalDist) * plotW;
-        const curEle = getElevation(curDist);
+        // use smoothed elevation for marker to match the drawn profile
+        let curEle = smoothed[0].ele;
+        for (let i = 1; i < smoothed.length; i++) {
+            if (smoothed[i].dist >= curDist) {
+                const t = (curDist - smoothed[i - 1].dist) / (smoothed[i].dist - smoothed[i - 1].dist);
+                curEle = smoothed[i - 1].ele + (smoothed[i].ele - smoothed[i - 1].ele) * (t || 0);
+                break;
+            }
+            curEle = smoothed[i].ele;
+        }
         const curY = pad.top + plotH * (1 - (curEle - minEle) / eleRange);
 
         elevCtx.strokeStyle = 'rgba(255,255,255,0.15)';
