@@ -84,6 +84,9 @@ const map = L.map('map', {
     zoom: ZOOM,
     zoomControl: true,
 });
+map.createPane('route');
+map.getPane('route').style.zIndex = 350;
+const routeRenderer = L.svg({ pane: 'route' });
 
 const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19,
@@ -122,10 +125,10 @@ document.getElementById('mapLayer').addEventListener('change', function() {
 
 L.marker([8.842428, -82.425013], {
     icon: L.divIcon({
-        className: '',
-        html: '<div style="background:#e74c3c;color:#fff;border:2px solid #fff;border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;box-shadow:0 1px 4px rgba(0,0,0,.4)">508</div>',
-        iconSize: [36, 36],
-        iconAnchor: [18, 18],
+        className: 'marker-508',
+        html: '<div class="marker-508-shape"><span>508</span></div>',
+        iconSize: [44, 46],
+        iconAnchor: [22, 43],
     }),
     zIndexOffset: 500,
 }).addTo(map);
@@ -319,17 +322,19 @@ function redrawPath() {
             weight: 4,
             opacity: 0.85,
             dashArray: null,
+            renderer: routeRenderer,
         }).addTo(map);
     }
 
     waypoints.forEach((pt, i) => {
-        const icon = L.divIcon({
-            className: 'waypoint-marker',
-            html: ' ',
-            iconSize: [12, 12],
-            iconAnchor: [6, 6],
-        });
-        const m = L.marker(pt, { icon }).addTo(map);
+        const m = L.circleMarker(pt, {
+            radius: 6,
+            color: '#fff',
+            weight: 2,
+            fillColor: '#4a7cf7',
+            fillOpacity: 1,
+            zIndexOffset: 400,
+        }).addTo(map);
         markers.push(m);
     });
 }
@@ -419,6 +424,7 @@ elSpeedUnit.addEventListener('change', () => {
     updateStartButton();
     updateInfo();
     renderSpeedPoints();
+    drawElevProfile();
 });
 
 // ============================================================
@@ -460,21 +466,6 @@ btnUndo.addEventListener('click', () => {
     updateStartButton();
     setStatus(waypoints.length ? 'Last point removed' : 'All points removed', '');
     deferElevRefresh();
-});
-
-const btnReverse = document.getElementById('btnReverse');
-btnReverse.addEventListener('click', () => {
-    reversed = !reversed;
-    btnReverse.textContent = reversed ? 'Reverse direction ✓' : 'Reverse direction';
-    btnReverse.style.borderColor = reversed ? '#4a7cf7' : '#2a3a5e';
-    if (totalDistanceKm > 0) {
-        traveledDistanceKm = totalDistanceKm - traveledDistanceKm;
-        if (isAtEnd) {
-            isAtEnd = false;
-            setStatus('Reversed from end — heading back', '');
-        }
-    }
-    setStatus(reversed ? 'Direction reversed' : 'Normal direction', '');
 });
 
 const chkFollow = document.getElementById('chkFollow');
@@ -653,9 +644,9 @@ function render112Points() {
     const chkLabels = document.getElementById('chkLabels');
     _112Points.forEach(p => {
         const m = L.circleMarker(p.latlng, {
-            radius: 10,
-            color: '#e74c3c',
-            weight: 3,
+            radius: 8,
+            color: '#fff',
+            weight: 2,
             fillColor: '#e74c3c',
             fillOpacity: 1,
             zIndexOffset: 900,
@@ -1624,16 +1615,20 @@ function drawElevProfile() {
         elevCtx.stroke();
     }
 
+    const isMph = speedUnit() === 'mph';
+    const elevUnit = isMph ? 'ft' : 'm';
+    const elevConv = isMph ? 3.28084 : 1;
+
     // Y labels
     elevCtx.fillStyle = 'rgba(255,255,255,0.35)';
     elevCtx.font = '10px sans-serif';
     elevCtx.textAlign = 'right';
     elevCtx.textBaseline = 'middle';
     for (let i = 0; i <= 4; i++) {
-        const ele = maxEle - eleRange * i / 4;
+        const ele = (maxEle - eleRange * i / 4) * elevConv;
         const y = pad.top + plotH * i / 4;
         if (y >= pad.top && y <= pad.top + plotH) {
-            elevCtx.fillText(Math.round(ele) + 'm', pad.left - 6, y);
+            elevCtx.fillText(Math.round(ele) + elevUnit, pad.left - 6, y);
         }
     }
 
@@ -1695,9 +1690,9 @@ function drawElevProfile() {
 
     // elevation info
     const curEle = isPlaying ? getElevation(traveledDistanceKm) : (routeElevationData[0] ? routeElevationData[0].ele : 0);
-    document.getElementById('elevInfo').textContent = `${Math.round(curEle)}m  ·  max ${Math.round(maxEle)}m  ·  min ${Math.round(minEle)}m`;
+    document.getElementById('elevInfo').textContent = `${Math.round(curEle * elevConv)}${elevUnit}  ·  max ${Math.round(maxEle * elevConv)}${elevUnit}  ·  min ${Math.round(minEle * elevConv)}${elevUnit}`;
     const infoEl = document.getElementById('infoElevation');
-    if (infoEl) infoEl.textContent = `${Math.round(curEle)}m`;
+    if (infoEl) infoEl.textContent = `${Math.round(curEle * elevConv)}${elevUnit}`;
 }
 
 // Initial draw

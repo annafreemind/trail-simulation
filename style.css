@@ -103,7 +103,7 @@ body {
 }
 .ctrl-row {
     display: flex;
-    gap: 10px;
+    gap: 12px;
 }
 .ctrl-row .ctrl-group {
     flex: 1;
@@ -448,6 +448,34 @@ body {
     font-weight: 700;
 }
 
+/* 508 teardrop marker */
+.marker-508 {
+    background: none !important;
+    border: none !important;
+}
+.marker-508-shape {
+    position: absolute;
+    left: 6px;
+    top: 3px;
+    width: 32px;
+    height: 32px;
+    background: #e74c3c;
+    border: 2px solid #fff;
+    border-radius: 50% 50% 50% 0;
+    transform: rotate(-45deg);
+    box-shadow: 0 1px 4px rgba(0,0,0,.4);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.marker-508-shape span {
+    transform: rotate(45deg);
+    line-height: 1;
+}
+
 /* Moving marker */
 .move-marker {
     background: #e74c3c;
@@ -459,13 +487,17 @@ body {
 }
 
 /* Scrollbar styling */
-#sidebar::-webkit-scrollbar {
+#sidebar * {
+    scrollbar-width: thin;
+    scrollbar-color: #2a3a5e #0f1a30;
+}
+#sidebar ::-webkit-scrollbar {
     width: 6px;
 }
-#sidebar::-webkit-scrollbar-track {
+#sidebar ::-webkit-scrollbar-track {
     background: #0f1a30;
 }
-#sidebar::-webkit-scrollbar-thumb {
+#sidebar ::-webkit-scrollbar-thumb {
     background: #2a3a5e;
     border-radius: 3px;
 }
@@ -518,7 +550,12 @@ body {
     font-size: 13px;
     line-height: 1.6;
     background: #16213e;
+    scrollbar-width: thin;
+    scrollbar-color: #2a3a5e #0f1a30;
 }
+.modal-body::-webkit-scrollbar { width: 6px; }
+.modal-body::-webkit-scrollbar-track { background: #0f1a30; }
+.modal-body::-webkit-scrollbar-thumb { background: #2a3a5e; border-radius: 3px; }
 .modal-body h1 { font-size: 20px; color: #f0f4ff; margin: 0 0 10px; }
 .modal-body h2 { font-size: 16px; color: #f0f4ff; margin: 18px 0 8px; border-bottom: 1px solid #2a3a5e; padding-bottom: 4px; }
 .modal-body h3 { font-size: 14px; color: #d0d8e8; margin: 12px 0 4px; }

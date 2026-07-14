@@ -68,7 +68,7 @@
                         <input type="text" id="stopLabel" placeholder="Label" value="" style="flex:1;background:#0f1a30;border:1px solid #2a3a5e;border-radius:4px;padding:6px 8px;color:#f0f4ff;font-size:12px;outline:none" />
                         <input type="text" id="stopDuration" placeholder="MM:SS" value="02:00" inputmode="numeric" style="width:65px;background:#0f1a30;border:1px solid #2a3a5e;border-radius:4px;padding:6px 8px;color:#f0f4ff;font-size:12px;outline:none;text-align:center;font-family:monospace" />
                     </div>
-                    <div style="font-size:11px;color:#8899bb">Click on the route to place a stop</div>
+                    <div style="font-size:11px;color:#8899bb">Enter a label and time, then click route to place a stop point</div>
                 </div>
 
                 <div id="speedInputs" style="display:none;margin:4px 0;padding:4px;background:#0a1528;border-radius:4px">
@@ -76,14 +76,14 @@
                         <input type="text" id="speedLabel" placeholder="Label" style="flex:1;background:#0f1a30;border:1px solid #2a3a5e;border-radius:4px;padding:6px 8px;color:#f0f4ff;font-size:12px;outline:none" />
                         <input type="number" id="speedValue" placeholder="Speed" value="1.7" min="0.1" step="0.1" style="width:70px;background:#0f1a30;border:1px solid #2a3a5e;border-radius:4px;padding:6px 8px;color:#f0f4ff;font-size:12px;outline:none" />
                     </div>
-                    <div style="font-size:11px;color:#8899bb">Click on the route to place a speed point</div>
+                    <div style="font-size:11px;color:#8899bb">Enter a label and speed, then click route to place a speed point</div>
                 </div>
 
                 <div id="customInputs" style="display:none;margin:4px 0;padding:4px;background:#0a1528;border-radius:4px">
                     <div style="display:flex;gap:4px;align-items:center;margin-bottom:3px">
                         <input type="text" id="customLabel" placeholder="Label" style="flex:1;background:#0f1a30;border:1px solid #2a3a5e;border-radius:4px;padding:6px 8px;color:#f0f4ff;font-size:12px;outline:none" />
                     </div>
-                    <div style="font-size:11px;color:#8899bb">Click on the map to place a custom point</div>
+                    <div style="font-size:11px;color:#8899bb">Enter a label, then click map to place a custom point</div>
                 </div>
 
                 <div id="scheduledStopList" style="max-height:80px;overflow-y:auto;font-size:12px;color:#8899bb"></div>
@@ -92,11 +92,11 @@
 
                 <div style="border-top:1px solid #2a3a5e;margin:6px 0"></div>
                 <div class="ctrl-row">
-                    <div class="ctrl-group" style="flex:2">
-                        <input type="text" id="routeName" placeholder="Route name" style="background:#0f1a30;border:1px solid #2a3a5e;border-radius:6px;padding:9px 12px;color:#f0f4ff;font-size:14px;outline:none;width:100%" />
+                    <div class="ctrl-group" style="flex:2;justify-content:flex-end">
+                        <input type="text" id="routeName" placeholder="Route name" style="background:#0f1a30;border:1px solid #2a3a5e;border-radius:6px;padding:5px 10px;color:#f0f4ff;font-size:12px;outline:none;width:100%" />
                     </div>
-                    <div class="ctrl-group" style="flex:1">
-                        <button class="btn btn-primary" id="btnSave" style="height:100%">Save</button>
+                    <div class="ctrl-group" style="justify-content:flex-end">
+                        <button class="btn btn-primary" id="btnSave" style="padding:6px 10px;font-size:12px">Save</button>
                     </div>
                 </div>
                 <div id="routeList" style="max-height:120px;overflow-y:auto;font-size:13px;color:#8899bb"></div>
@@ -134,23 +134,15 @@
                     </div>
                 </div>
 
-                <div class="ctrl-group">
+                <div class="ctrl-group" style="margin:5px 0;gap:8px">
                     <label for="timeScale">Time acceleration: <span id="timeScaleLabel">1</span>×</label>
                     <input type="range" id="timeScale" min="1" max="150" step="0.1" value="1" />
                 </div>
-
-                <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#aabbdd;cursor:pointer;padding:4px 0">
-                    <input type="checkbox" id="chk112" checked style="accent-color:#4a7cf7;width:16px;height:16px;cursor:pointer" />
-                    112 call notifications
-                </label>
 
                 <div class="btn-group">
                     <button class="btn btn-success" id="btnStart" disabled>Start</button>
                     <button class="btn btn-warning" id="btnPause" disabled>Pause</button>
                     <button class="btn btn-danger" id="btnStop" disabled>Stop</button>
-                </div>
-                <div class="btn-group">
-                    <button class="btn btn-outline" id="btnReverse">Reverse direction</button>
                 </div>
                 <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#aabbdd;cursor:pointer;padding:4px 0">
                     <input type="checkbox" id="chkFollow" style="accent-color:#4a7cf7;width:16px;height:16px;cursor:pointer" />
@@ -162,6 +154,10 @@
                     <span class="help-icon" tabindex="0">?
                         <span class="tooltip-text">When climbing uphill, speed decreases proportionally to slope steepness. At 14° or more — down to 50% of base speed. Elevation data from Open-Elevation API.</span>
                     </span>
+                </label>
+                <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#aabbdd;cursor:pointer;padding:4px 0">
+                    <input type="checkbox" id="chk112" checked style="accent-color:#4a7cf7;width:16px;height:16px;cursor:pointer" />
+                    112 call notifications
                 </label>
 
                 <div style="border-top:1px solid #2a3a5e;margin:6px 0"></div>
