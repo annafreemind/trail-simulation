@@ -22,19 +22,21 @@ Built with [Leaflet](https://leafletjs.com).
 
 ## How to run
 
-1. Make sure **Python 3** is installed:
+1. Download the latest release from the [Releases](https://github.com/annafreemind/trail-simulation/releases) page — grab the `Source code (zip)` from the Assets section of the most recent release. Unzip the archive.
+
+2. Make sure **Python 3** is installed:
    - **macOS**: `brew install python3` (install Homebrew from https://brew.sh first if needed)
    - **Ubuntu/Debian**: `sudo apt install python3`
    - **Fedora**: `sudo dnf install python3`
    - **Windows**: Download from https://python.org and check "Add Python to PATH" during installation
 
-2. Open a terminal in this directory and run:
+3. Open a terminal in the unzipped directory and run:
 
    ```bash
    python3 -m http.server 8000
    ```
 
-3. Open [http://localhost:8000](http://localhost:8000) in a browser.
+4. Open [http://localhost:8000](http://localhost:8000) in a browser.
 
 > Alternatively, use any other static server: `npx http-server`, VS Code Live Server, etc. Opening the HTML file directly (`file://`) may break some Leaflet features.
 
