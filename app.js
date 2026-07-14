@@ -54,6 +54,8 @@ let _112Points = [];
 let _112PointMarkers = [];
 let _prevSimSec = -1;
 let _smoothViewDir = 0;
+let _slopeDeg = 0;
+let _elevWaiting = false;
 let scheduledStops = [];
 let scheduledStopMarkers = [];
 let isAddingStops = false;
@@ -814,7 +816,23 @@ function animationLoop(timestamp) {
     }
 
     const speed = getSpeedKmh();
-    const speedKmPerSec = speed / 3600;
+    let effectiveSpeed = speed;
+    _slopeDeg = 0;
+    _elevWaiting = false;
+    if (document.getElementById('chkUphill').checked) {
+        if (routeElevationData.length >= 2) {
+            _slopeDeg = computeSlope(traveledDistanceKm, totalDistanceKm);
+            if (_slopeDeg > 0) {
+                effectiveSpeed = speed * Math.max(0.5, 1 - _slopeDeg / 28);
+            }
+            if (Math.floor(traveledDistanceKm * 100) % 50 === 0) {
+                console.log('uphill:', {elevCount: routeElevationData.length, slope: _slopeDeg.toFixed(1), dist: traveledDistanceKm.toFixed(3), totalDist: totalDistanceKm.toFixed(3), effSpeed: effectiveSpeed.toFixed(2), baseSpeed: speed.toFixed(2)});
+            }
+        } else {
+            _elevWaiting = true;
+        }
+    }
+    const speedKmPerSec = effectiveSpeed / 3600;
     traveledDistanceKm += speedKmPerSec * delta * multiplier;
 
     const pts = reversed ? [...waypoints].reverse() : waypoints;
@@ -898,7 +916,13 @@ function animationLoop(timestamp) {
         setStatus('Route completed — timer running', 'active');
     }
 
-    infoCurrentSpeed.textContent = formatSpeed(getSpeedKmh());
+    if (_elevWaiting) {
+        infoCurrentSpeed.textContent = 'Loading elevation\u2026';
+    } else if (_slopeDeg > 0) {
+        infoCurrentSpeed.textContent = formatSpeed(effectiveSpeed) + '  \u2191' + _slopeDeg.toFixed(0) + '\u00b0';
+    } else {
+        infoCurrentSpeed.textContent = formatSpeed(getSpeedKmh());
+    }
     updateTimerDisplay(simElapsedSeconds);
     updateCurrentTime(simElapsedSeconds);
     drawElevProfile();
@@ -1548,6 +1572,17 @@ function getElevation(distKm) {
         }
     }
     return last.ele;
+}
+
+function computeSlope(distKm, totalDistKm) {
+    if (routeElevationData.length < 2 || totalDistKm <= 0) return 0;
+    const step = 0.03;
+    const ahead = Math.min(distKm + step, totalDistKm);
+    const behind = Math.max(distKm - step, 0);
+    const rise = (getElevation(ahead) - getElevation(behind)) / 1000;
+    const run = (ahead - behind);
+    if (run <= 0) return 0;
+    return Math.atan2(rise, run) * 180 / Math.PI;
 }
 
 function drawElevProfile() {

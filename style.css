@@ -545,3 +545,61 @@ body {
         height: 50vh;
     }
 }
+
+/* Uphill checkbox help tooltip */
+.help-icon {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #2a3a5e;
+    color: #8ab4f8;
+    font-size: 11px;
+    font-weight: 700;
+    cursor: help;
+    user-select: none;
+    transition: background 0.15s;
+    flex-shrink: 0;
+}
+.help-icon:hover { background: #3a4a6e; }
+
+.tooltip-text {
+    visibility: hidden;
+    opacity: 0;
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: #16213e;
+    color: #c8d4e8;
+    font-size: 12px;
+    font-weight: 400;
+    padding: 8px 10px;
+    border-radius: 6px;
+    border: 1px solid #2a3a5e;
+    width: 240px;
+    text-align: left;
+    white-space: normal;
+    line-height: 1.4;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+    z-index: 1000;
+    transition: opacity 0.18s, visibility 0.18s;
+    pointer-events: none;
+}
+.help-icon:hover .tooltip-text,
+.help-icon:focus-visible .tooltip-text {
+    visibility: visible;
+    opacity: 1;
+}
+.tooltip-text::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 5px solid transparent;
+    border-top-color: #2a3a5e;
+}
