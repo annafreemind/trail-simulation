@@ -480,10 +480,41 @@ chkLabels.addEventListener('change', () => {
     renderCustomPoints();
 });
 
-const scheduledStopList = document.getElementById('scheduledStopList');
-const speedPointList = document.getElementById('speedPointList');
-const customPointList = document.getElementById('customPointList');
+const routePointList = document.getElementById('routePointList');
 const combinedNavList = document.getElementById('combinedNavList');
+
+function renderRoutePoints() {
+    const stops = scheduledStops.map((s, i) => ({ ...s, type: 'stop', idx: i }));
+    const speeds = speedPoints.map((sp, i) => ({ ...sp, type: 'speed', idx: i }));
+    const customs = customPoints.map((cp, i) => ({ ...cp, type: 'custom', idx: i }));
+    const all = [...stops, ...speeds].sort((a, b) => a.routeDist - b.routeDist);
+    const items = [...all, ...customs];
+    routePointList.innerHTML = items.map(item => {
+        const passed = item.type === 'stop' ? item.visited : (item.type === 'speed' ? item.activated : false);
+        const color = item.type === 'stop' ? '#f39c12' : item.type === 'speed' ? '#2ecc71' : '#9b59b6';
+        const detail = item.type === 'stop' ? formatStopDuration(item.duration) : (item.type === 'speed' ? formatSpeed(item.speed) : '');
+        return `<div style="padding:2px 0;border-bottom:1px solid #1a2a4e;display:flex;align-items:center;gap:6px;opacity:${passed ? 0.5 : 1}">
+            <span style="color:${color};flex-shrink:0">${passed ? '\u2713' : '\u25cf'}</span>
+            <span style="text-decoration:${passed ? 'line-through' : 'none'};flex:1">${item.label}</span>
+            ${detail ? `<span style="color:#8899bb;flex-shrink:0;font-size:11px">${detail}</span>` : ''}
+            <span class="del-route-point" data-type="${item.type}" data-index="${item.idx}" style="color:#e74c3c;cursor:pointer;font-size:14px;font-weight:700;line-height:1">\u00d7</span>
+        </div>`;
+    }).join('');
+}
+
+routePointList.addEventListener('click', (e) => {
+    const del = e.target.closest('.del-route-point');
+    if (!del) return;
+    const type = del.dataset.type;
+    const idx = parseInt(del.dataset.index);
+    if (type === 'stop') {
+        scheduledStops.splice(idx, 1);
+        renderScheduledStops();
+    } else if (type === 'speed') {
+        speedPoints.splice(idx, 1);
+        renderSpeedPoints();
+    }
+});
 
 function renderNavList() {
     const stops = scheduledStops.map(s => ({ ...s, type: 'stop' }));
@@ -507,13 +538,6 @@ function renderNavList() {
 function renderScheduledStops() {
     scheduledStopMarkers.forEach(m => map.removeLayer(m));
     scheduledStopMarkers = [];
-    scheduledStopList.innerHTML = scheduledStops.map((s, i) => {
-        const passed = s.visited;
-        return `<div style="padding:2px 0;border-bottom:1px solid #1a2a4e;display:flex;justify-content:space-between;align-items:center;opacity:${passed ? 0.5 : 1}">
-            <span><span style="color:${passed ? '#2ecc71' : '#f39c12'}">${passed ? '\u2713' : '\u25cf'}</span> <span style="text-decoration:${passed ? 'line-through' : 'none'}">${s.label}</span> <span style="color:#8899bb">${formatStopDuration(s.duration)}</span></span>
-            <span class="del-stop" data-index="${i}" style="color:#e74c3c;cursor:pointer;font-size:14px;font-weight:700;line-height:1">\u00d7</span>
-        </div>`;
-    }).join('');
     scheduledStops.forEach((s, i) => {
         const m = L.circleMarker(s.latlng, {
             radius: 8,
@@ -528,28 +552,13 @@ function renderScheduledStops() {
         }
         scheduledStopMarkers.push(m);
     });
+    renderRoutePoints();
     renderNavList();
 }
-
-scheduledStopList.addEventListener('click', (e) => {
-    const del = e.target.closest('.del-stop');
-    if (del) {
-        const i = parseInt(del.dataset.index);
-        scheduledStops.splice(i, 1);
-        renderScheduledStops();
-    }
-});
 
 function renderSpeedPoints() {
     speedPointMarkers.forEach(m => map.removeLayer(m));
     speedPointMarkers = [];
-    speedPointList.innerHTML = speedPoints.map((s, i) => {
-        const passed = s.activated;
-        return `<div style="padding:2px 0;border-bottom:1px solid #1a2a4e;display:flex;justify-content:space-between;align-items:center;opacity:${passed ? 0.5 : 1}">
-            <span><span style="color:${passed ? '#2ecc71' : '#f39c12'}">${passed ? '\u2713' : '\u25cf'}</span> <span style="text-decoration:${passed ? 'line-through' : 'none'}">${s.label}</span> <span style="color:#8899bb">${formatSpeed(s.speed)}</span></span>
-            <span class="del-speed" data-index="${i}" style="color:#e74c3c;cursor:pointer;font-size:14px;font-weight:700;line-height:1">\u00d7</span>
-        </div>`;
-    }).join('');
     speedPoints.forEach((s, i) => {
         const m = L.circleMarker(s.latlng, {
             radius: 8,
@@ -564,27 +573,13 @@ function renderSpeedPoints() {
         }
         speedPointMarkers.push(m);
     });
+    renderRoutePoints();
     renderNavList();
 }
-
-speedPointList.addEventListener('click', (e) => {
-    const del = e.target.closest('.del-speed');
-    if (del) {
-        const i = parseInt(del.dataset.index);
-        speedPoints.splice(i, 1);
-        renderSpeedPoints();
-    }
-});
 
 function renderCustomPoints() {
     customPointMarkers.forEach(m => map.removeLayer(m));
     customPointMarkers = [];
-    customPointList.innerHTML = customPoints.map((s, i) => {
-        return `<div style="padding:2px 0;border-bottom:1px solid #1a2a4e;display:flex;justify-content:space-between;align-items:center">
-            <span><span style="color:#9b59b6">\u25cf</span> ${s.label}</span>
-            <span class="del-custom" data-index="${i}" style="color:#e74c3c;cursor:pointer;font-size:14px;font-weight:700;line-height:1">\u00d7</span>
-        </div>`;
-    }).join('');
     customPoints.forEach(s => {
         const m = L.circleMarker(s.latlng, {
             radius: 8,
@@ -599,13 +594,22 @@ function renderCustomPoints() {
         }
         customPointMarkers.push(m);
     });
+    renderRoutePoints();
 }
 
-customPointList.addEventListener('click', (e) => {
-    const del = e.target.closest('.del-custom');
-    if (del) {
-        const i = parseInt(del.dataset.index);
-        customPoints.splice(i, 1);
+routePointList.addEventListener('click', (e) => {
+    const del = e.target.closest('.del-route-point');
+    if (!del) return;
+    const type = del.dataset.type;
+    const idx = parseInt(del.dataset.index);
+    if (type === 'stop') {
+        scheduledStops.splice(idx, 1);
+        renderScheduledStops();
+    } else if (type === 'speed') {
+        speedPoints.splice(idx, 1);
+        renderSpeedPoints();
+    } else if (type === 'custom') {
+        customPoints.splice(idx, 1);
         renderCustomPoints();
     }
 });
