@@ -1181,20 +1181,16 @@ async function loadRoute(name) {
     setStatus(`Route "${name}" loaded`, 'active');
     if (data.elevationData && data.elevationData.length >= 2) {
         routeElevationData = data.elevationData.map(d => ({ dist: d.dist, ele: d.ele }));
-        console.log('load elev:', routeElevationData.length, 'pts,', waypoints.length, 'wpts');
         drawElevProfile();
         if (routeElevationData.length <= waypoints.length + 5) {
-            console.log('elev sparse, re-fetching...');
             refreshElevations().then(() => saveElevData(name));
         }
     } else {
-        console.log('no elev data, fetching...');
         refreshElevations().then(() => saveElevData(name));
     }
 }
 
 async function saveElevData(name) {
-    console.log('auto-saving elev:', routeElevationData.length, 'pts');
     await updateRouteDB(name, routes => {
         if (routes[name]) {
             routes[name].elevationData = routeElevationData.map(d => ({ dist: d.dist, ele: d.ele }));
@@ -1693,7 +1689,12 @@ document.getElementById('elevViewToggle').addEventListener('click', function () 
 const elevCanvas = document.getElementById('elevView');
 const elevCtx = elevCanvas.getContext('2d');
 
+let _elevAbort = null;
+
 async function refreshElevations() {
+    if (_elevAbort) _elevAbort.abort();
+    _elevAbort = new AbortController();
+    const signal = _elevAbort.signal;
     if (waypoints.length < 2) {
         routeElevationData = [];
         drawElevProfile();
@@ -1737,17 +1738,24 @@ async function refreshElevations() {
         const allResults = [];
         for (let b = 0; b < points.length; b += BATCH) {
             if (b > 0) await new Promise(r => setTimeout(r, 150));
+            if (signal.aborted) return;
             const chunk = points.slice(b, b + BATCH);
-            const res = await fetch('https://api.open-elevation.com/api/v1/lookup', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ locations: chunk })
-            });
-            const data = await res.json();
-            if (data && data.results) {
-                for (let j = 0; j < data.results.length; j++) {
-                    allResults.push({ dist: dists[b + j], ele: data.results[j].elevation });
+            try {
+                const res = await fetch('https://api.open-elevation.com/api/v1/lookup', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ locations: chunk }),
+                    signal
+                });
+                const data = await res.json();
+                if (data && data.results) {
+                    for (let j = 0; j < data.results.length; j++) {
+                        allResults.push({ dist: dists[b + j], ele: data.results[j].elevation });
+                    }
                 }
+            } catch (e) {
+                if (e.name === 'AbortError') return;
+                console.error('Elevation batch fetch error:', e);
             }
         }
 
