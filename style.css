@@ -83,6 +83,8 @@ body {
     font-size: 14px;
     outline: none;
     transition: border 0.2s;
+    box-sizing: border-box;
+    line-height: normal;
 }
 .ctrl-group input:focus {
     border-color: #4a7cf7;
@@ -100,6 +102,12 @@ body {
 }
 .ctrl-group input::placeholder {
     color: #556688;
+}
+.time-input {
+    width: 85px;
+}
+.time-input::-webkit-calendar-picker-indicator {
+    display: none;
 }
 .ctrl-row {
     display: flex;
@@ -639,4 +647,17 @@ body {
     transform: translateX(-50%);
     border: 5px solid transparent;
     border-top-color: #2a3a5e;
+}
+
+.spinner-ring {
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(74,124,247,0.2);
+    border-top-color: rgba(74,124,247,0.8);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    flex-shrink: 0;
+}
+@keyframes spin {
+    to { transform: rotate(360deg); }
 }

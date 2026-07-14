@@ -126,11 +126,11 @@
                 <div class="ctrl-row">
                     <div class="ctrl-group">
                         <label for="startTime">Start time</label>
-                        <input type="time" id="startTime" value="13:15" />
+                        <input type="time" id="startTime" value="13:15" class="time-input" />
                     </div>
-                    <div class="ctrl-group" style="flex:1">
+                    <div class="ctrl-group">
                         <label for="speed">Base speed</label>
-                        <input type="number" id="speed" value="1.7" min="0.1" step="0.1" />
+                        <input type="number" id="speed" value="1.7" min="0.1" step="0.1" style="width:80px" />
                     </div>
                 </div>
 
@@ -145,7 +145,7 @@
                     <button class="btn btn-danger" id="btnStop" disabled>Stop</button>
                 </div>
                 <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#aabbdd;cursor:pointer;padding:4px 0">
-                    <input type="checkbox" id="chkFollow" style="accent-color:#4a7cf7;width:16px;height:16px;cursor:pointer" />
+                    <input type="checkbox" id="chkFollow" checked style="accent-color:#4a7cf7;width:16px;height:16px;cursor:pointer" />
                     Follow mode
                 </label>
                 <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#aabbdd;cursor:pointer;padding:4px 0">
@@ -191,12 +191,15 @@
              <div id="sunViewToggle" title="Toggle panel">▼</div>
            </div>
          </div>
-         <div class="elev-controls">
-            <canvas id="elevView" width="800" height="180"></canvas>
-           <div class="elev-caption">
-             <span class="elev-info" id="elevInfo">No elevation data</span>
-             <div id="elevViewToggle" title="Toggle elevation">▼</div>
-           </div>
+          <div class="elev-controls">
+             <canvas id="elevView" width="800" height="180"></canvas>
+            <div class="elev-caption">
+              <span style="display:flex;align-items:center;gap:6px">
+                <span class="elev-info" id="elevInfo">No elevation data</span>
+                <div class="spinner-ring" id="elevSpinner" style="display:none"></div>
+              </span>
+              <div id="elevViewToggle" title="Toggle elevation">▼</div>
+            </div>
          </div>
         <div id="alarm" style="display:none;position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:10000;background:#5c1a1a;border:2px solid #e74c3c;border-radius:8px;padding:12px 24px;text-align:center;font-size:18px;font-weight:700;color:#ff6b6b;box-shadow:0 4px 20px rgba(0,0,0,.5);transition:opacity 1s ease">First 112 call</div>
     </div>

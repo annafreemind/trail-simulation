@@ -12,10 +12,10 @@ Built with [Leaflet](https://leafletjs.com).
 - **Speed points** — change speed mid-route at specific waypoints
 - **Custom points** — place labeled purple markers anywhere on the map (not tracked during animation, useful for landmarks)
 - **Uphill auto-slowdown** — speed decreases proportionally on uphill sections (up to 50% at 14° slope or steeper); slope is computed from elevation data
-- **Sun widget** — first-person sky view with compass rose, heading arrow (smooth rotation), sun position at absolute azimuth, elevation scale, and realistic sky colors transitioning from day → sunset → twilight → night
-- **Elevation profile** — route elevation chart with Y-axis in meters or feet, X-axis in kilometers or miles (auto-switches with speed unit), current position dot, and elevation stats
+- **Sun widget** — first-person sky view with compass rose, heading arrow, sun position, and realistic sky colors; full-day sun trajectory on compass and sky; sun icon moves across the sky from sunrise to sunset; compass path shows how the sun arcs through the day
+- **Elevation profile** — route elevation chart with high-resolution data (sampled every 2 meters); auto-switches between metric and imperial units; smooth profile line with moving-average filtering
 - **112 alarms** — two call notifications at 16:39 and 16:51 with red markers on the route and a fading banner
-- **Save / Load / Export / Import** — routes persist in `localStorage` and can be backed up as `.json` files
+- **Save / Load / Export / Import** — routes and settings persist in your browser's storage and can be backed up as `.json` files; export includes your speed unit, map layer, and other preferences
 - **Follow mode** — map auto-pans to keep the moving marker centered
 - **Map layers** — switch between OpenStreetMap and OpenTopoMap
 - **Help modal** — opens this README in-app
@@ -77,12 +77,12 @@ Use custom markers to mark any location on the map that seems important to you �
 
 ### Saving and backing up
 
-1. Enter a name in the **Route name** field and click **Save**. The route is stored in your browser's `localStorage` and appears in the route list.
+1. Enter a name in the **Route name** field and click **Save**. The route is stored in your browser and appears in the route list.
 2. Click a saved route's name to load it. Click `×` to delete it.
-3. Use **Export** to download all routes and settings as a `.json` backup file.
-4. Use **Import** to restore from a previously exported file. You will be asked to confirm before overwriting existing data.
+3. Use **Export** to download all routes — together with your current settings — as a `.json` backup file. Settings include speed unit, map layer, label visibility, and follow mode.
+4. Use **Import** to restore from a previously exported file. You will be asked to confirm before overwriting existing data. Imported settings (speed unit, map layer, etc.) are applied automatically.
 
-> **Important**: Routes are stored in your browser's `localStorage`. Clearing browser data or using private/incognito mode will lose saved routes. Export regularly to keep backups.
+> **Important**: Routes and settings are stored locally in your browser. Clearing browser data or using private/incognito mode will lose them. Export regularly to keep backups.
 
 ### Running the simulation
 
@@ -127,7 +127,10 @@ Two alarm points are configured at **16:39** and **16:51**. When the simulated t
 A 400×300 canvas showing the sky as you would see it facing the current heading:
 
 - **Sky** — colors change throughout the day based on sun elevation: bright blue during daylight, warm yellows and oranges at sunset, deep purple at twilight, dark blue at night
-- **Compass** — a circle with cardinal directions (N/E/S/W), a yellow arrow showing the current heading (smoothed for natural rotation), and a sun icon at its true azimuth position
+- **Sun in the sky** — a glowing sun icon moves across the sky from right (east, sunrise) to left (west, sunset); its height matches the actual sun elevation in degrees — low on the horizon at dawn, high overhead at noon
+- **Sun trajectory** — a subtle dashed line traces the sun's full daily path through the sky, showing how it rises, climbs, and descends
+- **Compass** — a circle with cardinal directions (N/E/S/W); a red arrow shows the current heading
+- **Sun on the compass** — the sun icon sits inside the compass circle at a distance from center that reflects its elevation: near the center when overhead, near the edge when low; a dashed yellow path shows the sun's trajectory across the compass, curving toward the south at midday (true for the northern hemisphere)
 - **Elevation scale** — vertical marks on the left side at 30°, 60°, and 90°; a yellow marker shows the current sun elevation
 - **Mountain silhouette** — centered on the horizon for visual depth
 - **Ground** — darkens at night for a realistic look
@@ -137,15 +140,20 @@ A 400×300 canvas showing the sky as you would see it facing the current heading
 
 An 800×180 canvas showing the elevation along your route:
 
-- **Profile line** — the route's elevation plotted against distance
+- **Profile line** — the route's elevation plotted against distance, smoothed with a moving average for a clean, readable curve
 - **Y-axis** — elevation in **meters** or **feet** (switches automatically with the speed unit)
 - **X-axis** — distance in **kilometers** or **miles** (switches with the speed unit; values under 1 mile show in feet)
-- **Position marker** — a yellow dot with a dashed vertical line showing the current location during animation
+- **Position marker** — a red dot with a dashed vertical line showing the current location during animation
 - **Caption** — shows current, maximum, and minimum elevation with units
 - **Sidebar info** — current elevation in the Navigation tab
+- A small spinner appears while data is loading
 - Click **▼** to collapse, **▲** to expand
 
-Elevation data is fetched from the free [Open-Elevation API](https://api.open-elevation.com) for all waypoints when building or loading a route. Fetched data is saved with the route — loading a saved route does not re-fetch. If the API is unavailable, the profile shows "No elevation data".
+Elevation data is fetched from the free [Open-Elevation API](https://api.open-elevation.com) every **2 meters** along the route — not just at waypoints. This gives a detailed, accurate profile even for routes with sparse waypoints. Because the API has a per-request limit, the data is fetched in batches with a small delay between them to be respectful to the service.
+
+The data is saved with the route so loading is instant next time. If you load an older route saved before this feature was added (sparse elevation data), the app will automatically re-fetch at the higher resolution and update the saved route.
+
+The profile line is gently smoothed to remove the natural stair-step pattern of the digital elevation model, while preserving actual terrain features like hills and valleys.
 
 ### Map markers guide
 

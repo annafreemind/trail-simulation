@@ -18,6 +18,7 @@ const btnPause = document.getElementById('btnPause');
 const btnStop = document.getElementById('btnStop');
 const btnClear = document.getElementById('btnClear');
 const btnFit = document.getElementById('btnFit');
+const btnUndo = document.getElementById('btnUndo');
 const statusBar = document.getElementById('status-bar');
 const infoPoints = document.getElementById('infoPoints');
 const infoDistance = document.getElementById('infoDistance');
@@ -39,9 +40,7 @@ let lastFrameTimestamp = 0;
 let totalDistanceKm = 0;
 let traveledDistanceKm = 0;
 let simElapsedSeconds = 0;
-let completedAnimation = false;
-let reversed = false;
-let followMode = false;
+let followMode = true;
 let isAtEnd = false;
 let first112CallShown = false;
 let alarmTriggered = false;
@@ -224,6 +223,7 @@ function getPositionAtDistance(pts, distKm) {
     let accumulated = 0;
     for (let i = 1; i < pts.length; i++) {
         const segLen = haversineKm(pts[i - 1], pts[i]);
+        if (segLen <= 0) continue;
         if (accumulated + segLen >= distKm || i === pts.length - 1) {
             const frac = (distKm - accumulated) / segLen;
             const lat = pts[i - 1].lat + (pts[i].lat - pts[i - 1].lat) * frac;
@@ -240,6 +240,7 @@ function getBearingAtDistance(pts, distKm) {
     let accumulated = 0;
     for (let i = 1; i < pts.length; i++) {
         const segLen = haversineKm(pts[i - 1], pts[i]);
+        if (segLen <= 0) continue;
         if (accumulated + segLen >= distKm || i === pts.length - 1) {
             const lat1 = pts[i - 1].lat * Math.PI / 180;
             const lat2 = pts[i].lat * Math.PI / 180;
@@ -453,7 +454,6 @@ btnClear.addEventListener('click', () => {
     setStatus('Route cleared. Click the map to start a new one', '');
 });
 
-const btnUndo = document.getElementById('btnUndo');
 btnUndo.addEventListener('click', () => {
     if (waypoints.length === 0) return;
     waypoints.pop();
@@ -546,7 +546,7 @@ function renderSpeedPoints() {
     speedPointList.innerHTML = speedPoints.map((s, i) => {
         const passed = s.activated;
         return `<div style="padding:2px 0;border-bottom:1px solid #1a2a4e;display:flex;justify-content:space-between;align-items:center;opacity:${passed ? 0.5 : 1}">
-            <span><span style="color:${passed ? '#2ecc71' : '#2ecc71'}">${passed ? '\u2713' : '\u25cf'}</span> <span style="text-decoration:${passed ? 'line-through' : 'none'}">${s.label}</span> <span style="color:#8899bb">${formatSpeed(s.speed)}</span></span>
+            <span><span style="color:${passed ? '#2ecc71' : '#f39c12'}">${passed ? '\u2713' : '\u25cf'}</span> <span style="text-decoration:${passed ? 'line-through' : 'none'}">${s.label}</span> <span style="color:#8899bb">${formatSpeed(s.speed)}</span></span>
             <span class="del-speed" data-index="${i}" style="color:#e74c3c;cursor:pointer;font-size:14px;font-weight:700;line-height:1">\u00d7</span>
         </div>`;
     }).join('');
@@ -555,7 +555,7 @@ function renderSpeedPoints() {
             radius: 8,
             color: '#fff',
             weight: 2,
-            fillColor: s.activated ? '#2ecc71' : '#2ecc71',
+            fillColor: s.activated ? '#2ecc71' : '#f39c12',
             fillOpacity: s.activated ? 0.5 : 1,
             zIndexOffset: 600,
         }).addTo(map);
@@ -623,13 +623,18 @@ btnFit.addEventListener('click', () => {
     }
 });
 
+let _alarmTimeouts = [];
+
 function showAlarm(text) {
+    _alarmTimeouts.forEach(clearTimeout);
+    _alarmTimeouts = [];
     const el = document.getElementById('alarm');
     el.textContent = text;
     el.style.opacity = '1';
     el.style.display = 'block';
-    setTimeout(() => { el.style.opacity = '0'; }, 10000);
-    setTimeout(() => { el.style.display = 'none'; }, 11000);
+    const t1 = setTimeout(() => { el.style.opacity = '0'; }, 10000);
+    const t2 = setTimeout(() => { el.style.display = 'none'; }, 11000);
+    _alarmTimeouts.push(t1, t2);
 }
 
 function hideAlarm() {
@@ -674,7 +679,6 @@ function stopAnimation() {
     isPlaying = false;
     isPaused = false;
     isAtEnd = false;
-    completedAnimation = false;
     alarmTriggered = false;
     _112Fired = {};
     _112PointMarkers.forEach(m => map.removeLayer(m));
@@ -694,6 +698,7 @@ function stopAnimation() {
     btnStop.disabled = true;
     redrawPath();
     resetTimerDisplay();
+    updateStartButton();
 }
 
 function resetTimerDisplay() {
@@ -725,7 +730,7 @@ function startAnimation() {
 
     totalDistanceKm = pathLength(waypoints);
 
-    if (completedAnimation || isAtEnd) {
+    if (isAtEnd) {
         if (traveledDistanceKm >= totalDistanceKm) {
             setStatus('Add more waypoints to extend the route', 'error');
             return;
@@ -754,10 +759,9 @@ function startAnimation() {
             iconSize: [18, 18],
             iconAnchor: [9, 9],
         });
-        movingMarker = L.marker(reversed ? waypoints[waypoints.length - 1] : waypoints[0], { icon, zIndexOffset: 1000 }).addTo(map);
+        movingMarker = L.marker(waypoints[0], { icon, zIndexOffset: 1000 }).addTo(map);
     }
 
-    completedAnimation = false;
     isAtEnd = false;
     alarmTriggered = false;
     _prevSimSec = -1;
@@ -769,6 +773,7 @@ function startAnimation() {
     btnPause.disabled = false;
     btnPause.textContent = 'Pause';
     btnStop.disabled = false;
+    updateStartButton();
 
     lastFrameTimestamp = performance.now();
 
@@ -791,6 +796,22 @@ function animationLoop(timestamp) {
     }
 
     simElapsedSeconds += delta * multiplier;
+
+    // midnight check — stop when crossing midnight, day ends
+    const st = getStartDateTime();
+    if (st) {
+        const midnight = new Date(st);
+        midnight.setHours(24, 0, 0, 0);
+        const maxSec = (midnight - st) / 1000;
+        if (simElapsedSeconds >= maxSec) {
+            simElapsedSeconds = maxSec;
+            updateCurrentTime(simElapsedSeconds);
+            updateTimerDisplay(simElapsedSeconds);
+            setStatus('A day full of mysteries comes to an end…', '');
+            stopAnimation();
+            return;
+        }
+    }
 
     // Scheduled stop wait — timer keeps running, marker stays
     if (activeStopIndex >= 0) {
@@ -816,9 +837,6 @@ function animationLoop(timestamp) {
             if (_slopeDeg > 0) {
                 effectiveSpeed = speed * Math.max(0.5, 1 - _slopeDeg / 28);
             }
-            if (Math.floor(traveledDistanceKm * 100) % 50 === 0) {
-                console.log('uphill:', {elevCount: routeElevationData.length, slope: _slopeDeg.toFixed(1), dist: traveledDistanceKm.toFixed(3), totalDist: totalDistanceKm.toFixed(3), effSpeed: effectiveSpeed.toFixed(2), baseSpeed: speed.toFixed(2)});
-            }
         } else {
             _elevWaiting = true;
         }
@@ -826,10 +844,10 @@ function animationLoop(timestamp) {
     const speedKmPerSec = effectiveSpeed / 3600;
     traveledDistanceKm += speedKmPerSec * delta * multiplier;
 
-    const pts = reversed ? [...waypoints].reverse() : waypoints;
+    const pts = waypoints;
     const pos = getPositionAtDistance(pts, traveledDistanceKm);
     movingMarker.setLatLng(pos);
-    if (document.getElementById('chkFollow').checked) map.panTo(pos, { animate: false });
+    if (followMode) map.panTo(pos, { animate: false });
 
     // Check 112 alarms
     if (document.getElementById('chk112').checked) {
@@ -868,7 +886,7 @@ function animationLoop(timestamp) {
         for (let i = 0; i < scheduledStops.length; i++) {
             const s = scheduledStops[i];
             if (s.visited) continue;
-            const triggerAt = reversed ? totalDistanceKm - s.routeDist : s.routeDist;
+            const triggerAt = s.routeDist;
             if (traveledDistanceKm >= triggerAt) {
                 s.visited = true;
                 activeStopIndex = i;
@@ -888,7 +906,7 @@ function animationLoop(timestamp) {
     for (let i = 0; i < speedPoints.length; i++) {
         const sp = speedPoints[i];
         if (sp.activated) continue;
-        const triggerAt = reversed ? totalDistanceKm - sp.routeDist : sp.routeDist;
+        const triggerAt = sp.routeDist;
         if (traveledDistanceKm >= triggerAt) {
             sp.activated = true;
             elSpeed.value = formatSpeedVal(sp.speed);
@@ -899,7 +917,7 @@ function animationLoop(timestamp) {
     }
 
     if (traveledDistanceKm >= totalDistanceKm) {
-        const finalPos = reversed ? waypoints[0] : waypoints[waypoints.length - 1];
+        const finalPos = waypoints[waypoints.length - 1];
         movingMarker.setLatLng(finalPos);
         traveledDistanceKm = totalDistanceKm;
         isAtEnd = true;
@@ -1057,20 +1075,89 @@ elSpeed.addEventListener('input', () => {
 })();
 
 // ============================================================
-//   Save / Load
+//   IndexedDB storage (unlimited quota, replaces localStorage for routes)
 // ============================================================
-const STORAGE_KEY = 'trail_routes';
+const DB_NAME = 'trail_routes_db';
+const STORE_NAME = 'routes';
 
-function getSavedRoutes() {
-    try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; } catch { return {}; }
+function openDB() {
+    return new Promise((resolve, reject) => {
+        const req = indexedDB.open(DB_NAME, 1);
+        req.onupgradeneeded = () => { req.result.createObjectStore(STORE_NAME); };
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+    });
 }
 
-function loadRoute(name) {
-    const routes = getSavedRoutes();
+async function getRoutesDB() {
+    const db = await openDB();
+    const tx = db.transaction(STORE_NAME, 'readonly');
+    const store = tx.objectStore(STORE_NAME);
+    const req = store.openCursor();
+    const routes = {};
+    await new Promise((res, rej) => {
+        req.onsuccess = () => {
+            const cursor = req.result;
+            if (cursor) { routes[cursor.key] = cursor.value; cursor.continue(); }
+            else res();
+        };
+        req.onerror = () => rej(req.error);
+    });
+    db.close();
+    return routes;
+}
+
+async function saveRoutesDB(routes) {
+    const db = await openDB();
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    const store = tx.objectStore(STORE_NAME);
+    store.clear();
+    for (const [name, data] of Object.entries(routes)) {
+        store.put(data, name);
+    }
+    await new Promise((res, rej) => { tx.oncomplete = () => res(); tx.onerror = () => rej(tx.error); tx.onabort = () => rej(tx.error); });
+    db.close();
+}
+
+async function updateRouteDB(name, updater) {
+    const routes = await getRoutesDB();
+    updater(routes);
+    await saveRoutesDB(routes);
+}
+
+// legacy localStorage (for export/import compatibility)
+function getRoutesLS() {
+    try { return JSON.parse(localStorage.getItem('trail_routes')) || {}; } catch { return {}; }
+}
+function saveRoutesLS(routes) {
+    try { localStorage.setItem('trail_routes', JSON.stringify(routes)); } catch {}
+}
+
+// one-time migration
+async function migrateToDB() {
+    const dbRoutes = await getRoutesDB();
+    if (Object.keys(dbRoutes).length > 0) return;
+    const ls = getRoutesLS();
+    if (Object.keys(ls).length > 0) {
+        await saveRoutesDB(ls);
+    }
+}
+
+async function loadRoute(name) {
+    routeElevationData = [];
+    drawElevProfile();
+    const routes = await getRoutesDB();
     const data = routes[name];
     if (!data) { setStatus(`Route "${name}" not found`, 'error'); return; }
     stopAnimation();
-    waypoints = data.waypoints ? data.waypoints.map(p => L.latLng(p.lat, p.lng)) : data.map(p => L.latLng(p.lat, p.lng));
+    if (data.waypoints) {
+        waypoints = data.waypoints.map(p => L.latLng(p.lat, p.lng));
+    } else if (Array.isArray(data)) {
+        waypoints = data.map(p => L.latLng(p.lat, p.lng));
+    } else {
+        setStatus(`Route "${name}" is corrupted`, 'error');
+        return;
+    }
     redrawPath();
     scheduledStops = data.stops ? data.stops.map(s => {
         const pt = L.latLng(s.lat, s.lng);
@@ -1094,14 +1181,29 @@ function loadRoute(name) {
     setStatus(`Route "${name}" loaded`, 'active');
     if (data.elevationData && data.elevationData.length >= 2) {
         routeElevationData = data.elevationData.map(d => ({ dist: d.dist, ele: d.ele }));
+        console.log('load elev:', routeElevationData.length, 'pts,', waypoints.length, 'wpts');
         drawElevProfile();
+        if (routeElevationData.length <= waypoints.length + 5) {
+            console.log('elev sparse, re-fetching...');
+            refreshElevations().then(() => saveElevData(name));
+        }
     } else {
-        refreshElevations();
+        console.log('no elev data, fetching...');
+        refreshElevations().then(() => saveElevData(name));
     }
 }
 
-function populateRouteList() {
-    const routes = getSavedRoutes();
+async function saveElevData(name) {
+    console.log('auto-saving elev:', routeElevationData.length, 'pts');
+    await updateRouteDB(name, routes => {
+        if (routes[name]) {
+            routes[name].elevationData = routeElevationData.map(d => ({ dist: d.dist, ele: d.ele }));
+        }
+    });
+}
+
+async function populateRouteList() {
+    const routes = await getRoutesDB();
     const el = document.getElementById('routeList');
     const names = Object.keys(routes);
     if (!names.length) { el.innerHTML = ''; return; }
@@ -1113,27 +1215,28 @@ function populateRouteList() {
     `).join('');
 }
 
-document.getElementById('routeList').addEventListener('click', (e) => {
+document.getElementById('routeList').addEventListener('click', async (e) => {
     const nameEl = e.target.closest('.route-name');
     if (nameEl) {
         document.getElementById('routeName').value = nameEl.dataset.name;
-        loadRoute(nameEl.dataset.name);
+        await loadRoute(nameEl.dataset.name);
         return;
     }
     const del = e.target.closest('.del-route');
     if (del) {
         const name = del.dataset.name;
         if (!confirm(`Delete route "${name}"?`)) return;
-        const routes = getSavedRoutes();
+        const routes = await getRoutesDB();
         delete routes[name];
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(routes));
-        populateRouteList();
+        await saveRoutesDB(routes);
+        saveRoutesLS(routes);
+        await populateRouteList();
         document.getElementById('routeName').value = '';
         setStatus(`Route "${name}" deleted`, '');
     }
 });
 
-document.getElementById('btnSave').addEventListener('click', () => {
+document.getElementById('btnSave').addEventListener('click', async () => {
     if (waypoints.length < 2) {
         setStatus('Add at least 2 waypoints first', 'error');
         return;
@@ -1143,7 +1246,7 @@ document.getElementById('btnSave').addEventListener('click', () => {
         setStatus('Enter a route name', 'error');
         return;
     }
-    const routes = getSavedRoutes();
+    const routes = await getRoutesDB();
     routes[name] = {
         waypoints: waypoints.map(p => ({ lat: p.lat, lng: p.lng })),
         stops: scheduledStops.map(s => ({ lat: s.latlng.lat, lng: s.latlng.lng, label: s.label, duration: s.duration })),
@@ -1151,13 +1254,14 @@ document.getElementById('btnSave').addEventListener('click', () => {
         customPoints: customPoints.map(cp => ({ lat: cp.latlng.lat, lng: cp.latlng.lng, label: cp.label })),
         elevationData: routeElevationData.map(d => ({ dist: d.dist, ele: d.ele }))
     };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(routes));
-    populateRouteList();
+    await saveRoutesDB(routes);
+    saveRoutesLS(routes);
+    await populateRouteList();
     document.getElementById('routeName').value = '';
     setStatus(`Route "${name}" saved`, 'active');
 });
 
-populateRouteList();
+migrateToDB().then(() => populateRouteList());
 
 if (elSpeedUnit.value === 'mph') {
     elSpeed.value = '1.0';
@@ -1248,7 +1352,7 @@ function drawSunView(date) {
 
 let viewDir = 0;
     if (waypoints.length >= 2 && isPlaying) {
-        const pts = reversed ? [...waypoints].reverse() : waypoints;
+        const pts = waypoints;
         viewDir = getBearingAtDistance(pts, traveledDistanceKm);
     }
         if (viewDir === -1) viewDir = 0;
@@ -1285,6 +1389,62 @@ let viewDir = 0;
     grad.addColorStop(1, rgb(skyHor));
     sunCtx.fillStyle = grad;
     sunCtx.fillRect(0, 0, W, horizonY);
+
+    // full-day sun trajectory on the sky
+    const skyPathPoints = [];
+    for (const row of sunData.table) {
+        const el = row[2], az = row[3];
+        if (el > 0) {
+            const frac = Math.max(0, Math.min(1, 1 - (az - 70) / 220));
+            const px = W * frac;
+            const py = horizonY * (1 - el / 90);
+            skyPathPoints.push([px, py]);
+        }
+    }
+    if (skyPathPoints.length > 1) {
+        sunCtx.strokeStyle = 'rgba(255,200,60,0.2)';
+        sunCtx.lineWidth = 1.5;
+        sunCtx.setLineDash([4, 4]);
+        sunCtx.beginPath();
+        sunCtx.moveTo(skyPathPoints[0][0], skyPathPoints[0][1]);
+        for (let i = 1; i < skyPathPoints.length; i++) {
+            sunCtx.lineTo(skyPathPoints[i][0], skyPathPoints[i][1]);
+        }
+        sunCtx.stroke();
+        sunCtx.setLineDash([]);
+    }
+
+    // sun in the sky — rises from right (E), sets on left (W), height = elevation
+    if (sun.elev > 0) {
+        // fixed mapping: east (right) to west (left), independent of heading
+        const sunFrac = Math.max(0, Math.min(1, 1 - (sun.azim - 70) / 220));
+        const skyX = W * sunFrac;
+        const skyY = horizonY * (1 - sun.elev / 90);
+        // glow
+        sunCtx.fillStyle = 'rgba(255,220,80,0.15)';
+        sunCtx.beginPath();
+        sunCtx.arc(skyX, skyY, 14, 0, Math.PI * 2);
+        sunCtx.fill();
+        // rays
+        sunCtx.strokeStyle = 'rgba(255,210,60,0.6)';
+        sunCtx.lineWidth = 1.5;
+        for (let r = 0; r < 8; r++) {
+            const ra = r * Math.PI / 4;
+            sunCtx.beginPath();
+            sunCtx.moveTo(skyX + Math.cos(ra) * 8, skyY + Math.sin(ra) * 8);
+            sunCtx.lineTo(skyX + Math.cos(ra) * 13, skyY + Math.sin(ra) * 13);
+            sunCtx.stroke();
+        }
+        // body
+        const skyGrad = sunCtx.createRadialGradient(skyX - 1, skyY - 1, 0, skyX, skyY, 7);
+        skyGrad.addColorStop(0, '#fff8c0');
+        skyGrad.addColorStop(0.5, '#ffe066');
+        skyGrad.addColorStop(1, 'rgba(255,180,40,0.7)');
+        sunCtx.fillStyle = skyGrad;
+        sunCtx.beginPath();
+        sunCtx.arc(skyX, skyY, 7, 0, Math.PI * 2);
+        sunCtx.fill();
+    }
 
     // elevation scale (left side, full height)
     const scaleX = 12;
@@ -1335,12 +1495,12 @@ let viewDir = 0;
 
     // ground
     const groundBr = Math.max(0, Math.min(1, (elev + 3) / 13));
-    sunCtx.fillStyle = `rgba(40,55,40,${0.5 * groundBr})`;
+    sunCtx.fillStyle = `rgba(${Math.round(10 + 30 * groundBr)},${Math.round(15 + 40 * groundBr)},${Math.round(10 + 30 * groundBr)},1)`;
     sunCtx.fillRect(0, horizonY, W, sh - horizonY);
 
     // horizon line
-    sunCtx.strokeStyle = `rgba(255,255,255,${0.5 * groundBr})`;
-    sunCtx.lineWidth = 1;
+    sunCtx.strokeStyle = `rgba(${Math.round(30 + 90 * groundBr)},${Math.round(30 + 110 * groundBr)},${Math.round(30 + 70 * groundBr)},${0.15 + 0.35 * groundBr})`;
+    sunCtx.lineWidth = 1.5;
     sunCtx.beginPath();
     sunCtx.moveTo(sx, horizonY);
     sunCtx.lineTo(sx + sw, horizonY);
@@ -1348,9 +1508,9 @@ let viewDir = 0;
 
     // mountain silhouette (1500m away, assumed ~300m rise → ~12°)
     const mtnWidth = sw * 0.38;
-    const mtnHeight = arcR * 0.22; // ~12°
+    const mtnHeight = arcR * 0.38;
     const mtnX = cx;
-    sunCtx.fillStyle = `rgba(60,75,60,${0.85 * groundBr})`;
+    sunCtx.fillStyle = `rgba(${Math.round(15 + 45 * groundBr)},${Math.round(20 + 55 * groundBr)},${Math.round(15 + 45 * groundBr)},1)`;
     sunCtx.beginPath();
     sunCtx.moveTo(mtnX - mtnWidth / 2, horizonY);
     sunCtx.lineTo(mtnX, horizonY - mtnHeight);
@@ -1358,7 +1518,7 @@ let viewDir = 0;
     sunCtx.closePath();
     sunCtx.fill();
     // ridge line
-    sunCtx.strokeStyle = `rgba(120,140,100,${0.5 * groundBr})`;
+    sunCtx.strokeStyle = `rgba(${Math.round(30 + 90 * groundBr)},${Math.round(30 + 110 * groundBr)},${Math.round(30 + 70 * groundBr)},${0.15 + 0.35 * groundBr})`;
     sunCtx.lineWidth = 1.5;
     sunCtx.beginPath();
     sunCtx.moveTo(mtnX - mtnWidth / 2, horizonY);
@@ -1367,8 +1527,8 @@ let viewDir = 0;
     sunCtx.stroke();
 
 // compass — north-up, heading arrow, sun at absolute azimuth
-    const compR = 30;
-    const compCX = mtnX, compCY = horizonY + 28;
+    const compR = 48;
+    const compCX = mtnX, compCY = horizonY + 20;
     sunCtx.save();
     sunCtx.translate(compCX, compCY);
 
@@ -1383,6 +1543,29 @@ let viewDir = 0;
     sunCtx.beginPath();
     sunCtx.arc(0, 0, compR, 0, Math.PI * 2);
     sunCtx.stroke();
+
+    // full-day sun trajectory on compass
+    const pathPoints = [];
+    for (const row of sunData.table) {
+        const el = row[2], az = row[3];
+        if (el > 0) {
+            const r = compR * (1 - el / 90);
+            const [px, py] = polar(az, r);
+            pathPoints.push([px, py]);
+        }
+    }
+    if (pathPoints.length > 1) {
+        sunCtx.strokeStyle = 'rgba(255,200,60,0.3)';
+        sunCtx.lineWidth = 2;
+        sunCtx.setLineDash([4, 4]);
+        sunCtx.beginPath();
+        sunCtx.moveTo(pathPoints[0][0], pathPoints[0][1]);
+        for (let i = 1; i < pathPoints.length; i++) {
+            sunCtx.lineTo(pathPoints[i][0], pathPoints[i][1]);
+        }
+        sunCtx.stroke();
+        sunCtx.setLineDash([]);
+    }
 
     // N/E/S/W labels
     const dirs = [
@@ -1400,28 +1583,31 @@ let viewDir = 0;
         sunCtx.fillText(d.label, tx, ty);
     });
 
-    // heading arrow — thick line from center in heading direction
-    const [hx, hy] = polar(viewDir, compR - 3);
-    sunCtx.strokeStyle = '#ffe066';
-    sunCtx.lineWidth = 3;
+    // heading arrow — red, from offset to compass edge
+    const arrowStartR = compR * 0.25;
+    const [hx, hy] = polar(viewDir, compR);
+    const [ox, oy] = polar(viewDir, arrowStartR);
+    sunCtx.strokeStyle = '#e74c3c';
+    sunCtx.lineWidth = 5;
     sunCtx.beginPath();
-    sunCtx.moveTo(0, 0);
+    sunCtx.moveTo(ox, oy);
     sunCtx.lineTo(hx, hy);
     sunCtx.stroke();
     // arrowhead
     const aRad = (viewDir - 90) * Math.PI / 180;
     const pR = aRad + Math.PI / 2;
-    sunCtx.fillStyle = '#ffe066';
+    sunCtx.fillStyle = '#e74c3c';
     sunCtx.beginPath();
     sunCtx.moveTo(hx, hy);
-    sunCtx.lineTo(hx - Math.cos(aRad) * 7 + Math.cos(pR) * 4, hy - Math.sin(aRad) * 7 + Math.sin(pR) * 4);
-    sunCtx.lineTo(hx - Math.cos(aRad) * 7 - Math.cos(pR) * 4, hy - Math.sin(aRad) * 7 - Math.sin(pR) * 4);
+    sunCtx.lineTo(hx - Math.cos(aRad) * 10 + Math.cos(pR) * 6, hy - Math.sin(aRad) * 10 + Math.sin(pR) * 6);
+    sunCtx.lineTo(hx - Math.cos(aRad) * 10 - Math.cos(pR) * 6, hy - Math.sin(aRad) * 10 - Math.sin(pR) * 6);
     sunCtx.closePath();
     sunCtx.fill();
 
     // sun icon
     {
-        const [six, siy] = polar(sun.azim, compR + 12);
+        const sunR = compR * (1 - Math.max(0, sun.elev) / 90);
+        const [six, siy] = polar(sun.azim, sunR);
         // glow
         sunCtx.fillStyle = 'rgba(255,220,80,0.12)';
         sunCtx.beginPath();
@@ -1515,28 +1701,71 @@ async function refreshElevations() {
     }
     document.getElementById('elevInfo').textContent = 'Loading...';
     document.getElementById('infoElevation').textContent = '…';
+    document.getElementById('elevSpinner').style.display = 'inline-block';
     try {
-        const locations = waypoints.map(p => ({ latitude: p.lat, longitude: p.lng }));
-        const res = await fetch('https://api.open-elevation.com/api/v1/lookup', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ locations })
-        });
-        const data = await res.json();
-        if (data && data.results && data.results.length === waypoints.length) {
-            routeElevationData = [];
-            let cumDist = 0;
-            routeElevationData.push({ dist: 0, ele: data.results[0].elevation });
-            for (let i = 1; i < waypoints.length; i++) {
-                cumDist += haversineKm(waypoints[i - 1], waypoints[i]);
-                routeElevationData.push({ dist: cumDist, ele: data.results[i].elevation });
+        const totalDist = pathLength(waypoints);
+        const stepKm = 0.002; // 2m
+        const points = [];
+        const dists = [];
+        let d = 0, segIdx = 0, segPos = 0;
+        while (d <= totalDist + 0.0001) {
+            dists.push(d);
+            // find which segment we're on
+            while (segIdx < waypoints.length - 1) {
+                const segLen = haversineKm(waypoints[segIdx], waypoints[segIdx + 1]);
+                if (segPos + 0.0001 >= segLen) {
+                    segPos -= segLen;
+                    segIdx++;
+                } else {
+                    break;
+                }
             }
+            if (segIdx >= waypoints.length - 1) {
+                points.push({ latitude: waypoints[waypoints.length - 1].lat, longitude: waypoints[waypoints.length - 1].lng });
+            } else {
+                const segLen = haversineKm(waypoints[segIdx], waypoints[segIdx + 1]);
+                const t = segLen > 0 ? segPos / segLen : 0;
+                const lat = waypoints[segIdx].lat + (waypoints[segIdx + 1].lat - waypoints[segIdx].lat) * t;
+                const lng = waypoints[segIdx].lng + (waypoints[segIdx + 1].lng - waypoints[segIdx].lng) * t;
+                points.push({ latitude: lat, longitude: lng });
+            }
+            d += stepKm;
+            segPos += stepKm;
+        }
+
+        const BATCH = 100;
+        const allResults = [];
+        for (let b = 0; b < points.length; b += BATCH) {
+            if (b > 0) await new Promise(r => setTimeout(r, 150));
+            const chunk = points.slice(b, b + BATCH);
+            const res = await fetch('https://api.open-elevation.com/api/v1/lookup', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ locations: chunk })
+            });
+            const data = await res.json();
+            if (data && data.results) {
+                for (let j = 0; j < data.results.length; j++) {
+                    allResults.push({ dist: dists[b + j], ele: data.results[j].elevation });
+                }
+            }
+        }
+
+        if (allResults.length >= 2) {
+            routeElevationData = allResults;
+            _elevWaiting = false;
             drawElevProfile();
+            document.getElementById('elevSpinner').style.display = 'none';
         } else {
+            routeElevationData = [];
+            _elevWaiting = false;
             drawElevProfile();
+            document.getElementById('elevSpinner').style.display = 'none';
         }
     } catch (err) {
         console.error('Elevation fetch error:', err);
+        _elevWaiting = false;
+        document.getElementById('elevSpinner').style.display = 'none';
         if (routeElevationData.length >= 2) {
             drawElevProfile();
         } else {
@@ -1642,26 +1871,49 @@ function drawElevProfile() {
         elevCtx.fillText(formatDistance(dist), x, H - pad.bottom + 6);
     }
 
-    // profile path
+    // profile path — with sliding-window smoothing (50m half-window)
+    const smoothed = [];
+    const SMOOTH_KM = 0.05;
+    let winStart = 0, winEnd = 0, winSum = 0;
+    for (let i = 0; i < routeElevationData.length; i++) {
+        const d = routeElevationData[i].dist;
+        while (routeElevationData[winStart].dist < d - SMOOTH_KM) {
+            winSum -= routeElevationData[winStart].ele;
+            winStart++;
+        }
+        while (winEnd < routeElevationData.length && routeElevationData[winEnd].dist <= d + SMOOTH_KM) {
+            winSum += routeElevationData[winEnd].ele;
+            winEnd++;
+        }
+        smoothed.push({ dist: d, ele: winSum / (winEnd - winStart) });
+    }
+    // build profile coordinates once
+    const coords = [];
+    for (let i = 0; i < smoothed.length; i++) {
+        const x = pad.left + (smoothed[i].dist / totalDist) * plotW;
+        const y = pad.top + plotH * (1 - (smoothed[i].ele - minEle) / eleRange);
+        coords.push([x, y]);
+    }
+
     elevCtx.strokeStyle = '#4a7cf7';
     elevCtx.lineWidth = 2;
-    elevCtx.beginPath();
-    for (let i = 0; i < routeElevationData.length; i++) {
-        const x = pad.left + (routeElevationData[i].dist / totalDist) * plotW;
-        const y = pad.top + plotH * (1 - (routeElevationData[i].ele - minEle) / eleRange);
-        if (i === 0) elevCtx.moveTo(x, y);
-        else elevCtx.lineTo(x, y);
-    }
-    elevCtx.stroke();
 
     // fill under curve
-    const lastX = pad.left + plotW;
-    const baseY = pad.top + plotH;
     elevCtx.fillStyle = 'rgba(74,124,247,0.08)';
-    elevCtx.lineTo(lastX, baseY);
-    elevCtx.lineTo(pad.left, baseY);
+    elevCtx.beginPath();
+    elevCtx.moveTo(coords[0][0], coords[0][1]);
+    for (let i = 1; i < coords.length; i++) elevCtx.lineTo(coords[i][0], coords[i][1]);
+    const baseY = pad.top + plotH;
+    elevCtx.lineTo(coords[coords.length - 1][0], baseY);
+    elevCtx.lineTo(coords[0][0], baseY);
     elevCtx.closePath();
     elevCtx.fill();
+
+    // profile line
+    elevCtx.beginPath();
+    elevCtx.moveTo(coords[0][0], coords[0][1]);
+    for (let i = 1; i < coords.length; i++) elevCtx.lineTo(coords[i][0], coords[i][1]);
+    elevCtx.stroke();
 
     // current position marker
     if (isPlaying && totalDistanceKm > 0) {
@@ -1679,7 +1931,7 @@ function drawElevProfile() {
         elevCtx.stroke();
         elevCtx.setLineDash([]);
 
-        elevCtx.fillStyle = '#ffe066';
+        elevCtx.fillStyle = '#e74c3c';
         elevCtx.beginPath();
         elevCtx.arc(curX, curY, 4, 0, Math.PI * 2);
         elevCtx.fill();
@@ -1701,11 +1953,13 @@ drawElevProfile();
 // ============================================================
 //   Export / Import
 // ============================================================
-document.getElementById('btnExport').addEventListener('click', () => {
+document.getElementById('btnExport').addEventListener('click', async () => {
+    const routes = await getRoutesDB();
+    saveRoutesLS(routes);
     const data = {
         version: 1,
         exportedAt: new Date().toISOString(),
-        routes: getSavedRoutes(),
+        routes: routes,
         settings: {
             speedUnit: document.getElementById('speedUnit').value,
             mapLayer: document.getElementById('mapLayer').value,
@@ -1723,8 +1977,8 @@ document.getElementById('btnExport').addEventListener('click', () => {
     setStatus('Routes exported', '');
 });
 
-document.getElementById('btnImport').addEventListener('click', () => {
-    const saved = getSavedRoutes();
+document.getElementById('btnImport').addEventListener('click', async () => {
+    const saved = await getRoutesDB();
     if (saved && Object.keys(saved).length > 0) {
         if (!confirm('Existing routes will be replaced. Export them first to keep a backup.\n\nContinue with import?')) {
             return;
@@ -1733,29 +1987,47 @@ document.getElementById('btnImport').addEventListener('click', () => {
     document.getElementById('importFile').click();
 });
 
-document.getElementById('importFile').addEventListener('change', function (e) {
+document.getElementById('importFile').addEventListener('change', async function (e) {
     const file = e.target.files[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = (ev) => {
+    reader.onload = async (ev) => {
+        let data;
+        try { data = JSON.parse(ev.target.result); }
+        catch { setStatus('Invalid file format', 'error'); return; }
         try {
-            const data = JSON.parse(ev.target.result);
             if (!data.routes || typeof data.routes !== 'object') {
                 setStatus('Invalid file format', 'error');
                 return;
             }
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(data.routes));
+            await saveRoutesDB(data.routes);
+            saveRoutesLS(data.routes);
             if (data.settings) {
                 const s = data.settings;
-                if (s.speedUnit) document.getElementById('speedUnit').value = s.speedUnit;
-                if (s.mapLayer) document.getElementById('mapLayer').value = s.mapLayer;
-                if (s.chkLabels !== undefined) document.getElementById('chkLabels').checked = s.chkLabels;
-                if (s.chkFollow !== undefined) document.getElementById('chkFollow').checked = s.chkFollow;
+                if (s.speedUnit) {
+                    document.getElementById('speedUnit').value = s.speedUnit;
+                    document.getElementById('speedUnit').dispatchEvent(new Event('change'));
+                }
+                if (s.mapLayer) {
+                    document.getElementById('mapLayer').value = s.mapLayer;
+                    document.getElementById('mapLayer').dispatchEvent(new Event('change'));
+                }
+                if (s.chkLabels !== undefined) {
+                    document.getElementById('chkLabels').checked = s.chkLabels;
+                    renderScheduledStops();
+                    renderSpeedPoints();
+                    renderCustomPoints();
+                }
+                if (s.chkFollow !== undefined) {
+                    document.getElementById('chkFollow').checked = s.chkFollow;
+                    followMode = s.chkFollow;
+                }
             }
-            populateRouteList();
+            await populateRouteList();
             setStatus(`${Object.keys(data.routes).length} route(s) imported`, '');
         } catch (err) {
-            setStatus('Failed to parse file', 'error');
+            console.error('Import failed:', err);
+            setStatus('Failed to import: ' + err.message, 'error');
         }
     };
     reader.readAsText(file);
