@@ -126,7 +126,7 @@ Two alarm points are configured at **16:39** and **16:51**. When the simulated t
 
 A 400×300 canvas showing the sky as you would see it facing the current heading:
 
-- **Sky** — colors driven by three data sources: (1) **sun elevation** — controls hue: bright blue by day, orange at sunset, dark blue at night; (2) **solar radiation** — historical ERA5 data (W/m²) for Boquete, April 1 2014: brightness dims as radiation drops, not just by sun angle; (3) **sun azimuth** — a subtle dark shadow on the side opposite the sun, visible when the sun is below 30° elevation
+- **Sky** — colors driven by three data sources: (1) **sun elevation** — controls hue: bright blue by day, orange at sunset, dark blue at night; (2) **solar radiation** — historical ERA5 data (W/m²) for Boquete, April 1 2014, fetched from the [Open-Meteo Archive API](https://open-meteo.com/en/docs/historical-weather-api): brightness dims as radiation drops, not just by sun angle; (3) **sun azimuth** — a subtle dark shadow on the side opposite the sun, visible when the sun is below 30° elevation
 - **Sun in the sky** — a glowing sun icon moves across the sky from right (east, sunrise) to left (west, sunset); its height matches the actual sun elevation in degrees — low on the horizon at dawn, high overhead at noon
 - **Sun trajectory** — a subtle dashed line traces the sun's full daily path through the sky, showing how it rises, climbs, and descends
 - **Compass** — a circle with cardinal directions (N/E/S/W); a red arrow shows the current heading
@@ -162,3 +162,4 @@ The profile line is gently smoothed to remove the natural stair-step pattern of 
 - **Map tiles**: [OpenStreetMap](https://openstreetmap.org) and [OpenTopoMap](https://opentopomap.org)
 - **Elevation**: [Open-Elevation API](https://api.open-elevation.com)
 - **Sun position**: pre-computed with [astral](https://astral.readthedocs.io/) for Boquete, Panama (8.843°N, 82.425°W), April 1 2014, UTC−5, 5-minute intervals
+- **Weather**: [Open-Meteo Archive API](https://open-meteo.com/en/docs/historical-weather-api) (ERA5 reanalysis) — historical temperature, wind, cloud cover, and solar radiation for Boquete, April 1 2014, hourly
