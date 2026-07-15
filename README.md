@@ -133,7 +133,6 @@ A 400×300 canvas showing the sky as you would see it facing the current heading
 - **Sun on the compass** — the sun icon sits inside the compass circle at a distance from center that reflects its elevation: near the center when overhead, near the edge when low; a dashed yellow path shows the sun's trajectory across the compass, curving toward the south at midday (true for the northern hemisphere)
 - **Elevation scale** — vertical marks on the left side at 30°, 60°, and 90°; a yellow marker shows the current sun elevation
 - **Mountain silhouette** — centered on the horizon for visual depth
-- **Ground** — darkens at night for a realistic look
 - Click **▼** to collapse the widget to a small button, **▲** to expand it
 
 ### Elevation profile widget (left of sun widget)
@@ -146,7 +145,6 @@ An 800×180 canvas showing the elevation along your route:
 - **Position marker** — a red dot with a dashed vertical line showing the current location during animation
 - **Caption** — shows current, maximum, and minimum elevation with units
 - **Sidebar info** — current elevation in the Navigation tab
-- A small spinner appears while data is loading
 - Click **▼** to collapse, **▲** to expand
 
 Elevation data is fetched from the free [Open-Elevation API](https://api.open-elevation.com) every **30 meters** along the route — matching the native resolution of the underlying SRTM digital elevation model. Sampling at a higher density would provide no additional accuracy while wasting API calls. Because the API has a per-request limit, the data is fetched in batches with a small delay between them to be respectful to the service.
@@ -162,4 +160,4 @@ The profile line is gently smoothed to remove the natural stair-step pattern of 
 - **Map tiles**: [OpenStreetMap](https://openstreetmap.org), [OpenTopoMap](https://opentopomap.org), and [Esri World Imagery](https://www.arcgis.com/home/item.html?id=10df2279f9684e4a9f6a7f08febac2a9)
 - **Elevation**: [Open-Elevation API](https://api.open-elevation.com)
 - **Sun position**: pre-computed with [astral](https://astral.readthedocs.io/) for Boquete, Panama (8.843°N, 82.425°W), April 1 2014, UTC−5, 5-minute intervals
-- **Weather**: [Open-Meteo Archive API](https://open-meteo.com/en/docs/historical-weather-api) (ERA5 reanalysis) — historical temperature, wind, cloud cover, and solar radiation for Boquete, April 1 2014, hourly
+- **Weather**: [Open-Meteo Archive API](https://open-meteo.com/en/docs/historical-weather-api) (ERA5 reanalysis) — historical temperature, wind, cloud cover, and solar radiation for Boquete (8.84°N, 82.42°W), April 1 2014, hourly; spatial resolution ~28×28 km (0.25° grid), temperature accuracy ±1–2°C, cloud cover lower accuracy in tropics
