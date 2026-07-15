@@ -396,7 +396,7 @@ map.on('click', (e) => {
     updateInfo();
     updateStartButton();
     setStatus(`Waypoint ${waypoints.length} added`, '');
-    deferElevRefresh();
+    appendLastSegmentElevation();
 });
 
 // ============================================================
@@ -456,6 +456,8 @@ btnClear.addEventListener('click', () => {
 
 btnUndo.addEventListener('click', () => {
     if (waypoints.length === 0) return;
+    if (_elevTimer) { clearTimeout(_elevTimer); _elevTimer = null; }
+    if (_elevAbort) _elevAbort.abort();
     waypoints.pop();
     if (waypoints.length < 2 && polyline) {
         map.removeLayer(polyline);
@@ -465,7 +467,13 @@ btnUndo.addEventListener('click', () => {
     updateInfo();
     updateStartButton();
     setStatus(waypoints.length ? 'Last point removed' : 'All points removed', '');
-    deferElevRefresh();
+    if (waypoints.length < 2) {
+        routeElevationData = [];
+    } else {
+        const totalDist = pathLength(waypoints);
+        routeElevationData = routeElevationData.filter(d => d.dist <= totalDist + 0.0001);
+    }
+    drawElevProfile();
 });
 
 const chkFollow = document.getElementById('chkFollow');
@@ -490,7 +498,7 @@ function renderRoutePoints() {
     const all = [...stops, ...speeds].sort((a, b) => a.routeDist - b.routeDist);
     const items = [...all, ...customs];
     routePointList.innerHTML = items.map(item => {
-        const passed = item.type === 'stop' ? item.visited : (item.type === 'speed' ? item.activated : false);
+        const passed = false;
         const color = item.type === 'stop' ? '#f39c12' : item.type === 'speed' ? '#2ecc71' : '#9b59b6';
         const detail = item.type === 'stop' ? formatStopDuration(item.duration) : (item.type === 'speed' ? formatSpeed(item.speed) : '');
         return `<div style="padding:2px 0;border-bottom:1px solid #1a2a4e;display:flex;align-items:center;gap:6px;opacity:${passed ? 0.5 : 1}">
@@ -1414,12 +1422,14 @@ let viewDir = 0;
         sunCtx.setLineDash([]);
     }
 
-    // sun in the sky — rises from right (E), sets on left (W), height = elevation
-    if (sun.elev > 0) {
-        // fixed mapping: east (right) to west (left), independent of heading
+    // sun in the sky — fade out between horizon and −6° (civil twilight)
+    if (sun.elev > -6) {
+        const alpha = sun.elev < 0 ? 1 + sun.elev / 6 : 1;
+        sunCtx.save();
+        sunCtx.globalAlpha = alpha;
         const sunFrac = Math.max(0, Math.min(1, 1 - (sun.azim - 70) / 220));
         const skyX = W * sunFrac;
-        const skyY = horizonY * (1 - sun.elev / 90);
+        const skyY = horizonY * (1 - Math.max(0, sun.elev) / 90);
         // glow
         sunCtx.fillStyle = 'rgba(255,220,80,0.15)';
         sunCtx.beginPath();
@@ -1444,6 +1454,7 @@ let viewDir = 0;
         sunCtx.beginPath();
         sunCtx.arc(skyX, skyY, 7, 0, Math.PI * 2);
         sunCtx.fill();
+        sunCtx.restore();
     }
 
     // elevation scale (left side, full height)
@@ -1604,8 +1615,11 @@ let viewDir = 0;
     sunCtx.closePath();
     sunCtx.fill();
 
-    // sun icon
-    {
+    // sun icon — fade out between horizon and −6° (civil twilight)
+    if (sun.elev > -6) {
+        const alpha = sun.elev < 0 ? 1 + sun.elev / 6 : 1;
+        sunCtx.save();
+        sunCtx.globalAlpha = alpha;
         const sunR = compR * (1 - Math.max(0, sun.elev) / 90);
         const [six, siy] = polar(sun.azim, sunR);
         // glow
@@ -1632,6 +1646,7 @@ let viewDir = 0;
         sunCtx.beginPath();
         sunCtx.arc(six, siy, 6, 0, Math.PI * 2);
         sunCtx.fill();
+        sunCtx.restore();
     }
 
     sunCtx.restore();
@@ -1709,7 +1724,7 @@ async function refreshElevations() {
     document.getElementById('elevSpinner').style.display = 'inline-block';
     try {
         const totalDist = pathLength(waypoints);
-        const stepKm = 0.002; // 2m
+        const stepKm = 0.03;
         const points = [];
         const dists = [];
         let d = 0, segIdx = 0, segPos = 0;
@@ -1790,6 +1805,77 @@ async function refreshElevations() {
 function deferElevRefresh() {
     if (_elevTimer) clearTimeout(_elevTimer);
     _elevTimer = setTimeout(() => { refreshElevations(); _elevTimer = null; }, 300);
+}
+
+async function appendLastSegmentElevation() {
+    if (waypoints.length < 2) return;
+    if (_elevAbort) _elevAbort.abort();
+    _elevAbort = new AbortController();
+    const signal = _elevAbort.signal;
+
+    const i = waypoints.length - 2;
+    let startDist = 0;
+    for (let j = 0; j < i; j++) startDist += haversineKm(waypoints[j], waypoints[j + 1]);
+
+    const from = waypoints[i];
+    const to = waypoints[i + 1];
+    const segLen = haversineKm(from, to);
+    const stepKm = 0.03;
+    const nPoints = Math.ceil(segLen / stepKm) + 1;
+    const points = [];
+    for (let k = 0; k < nPoints; k++) {
+        const t = Math.min(k * stepKm / (segLen || 1), 1);
+        points.push({
+            latitude: from.lat + (to.lat - from.lat) * t,
+            longitude: from.lng + (to.lng - from.lng) * t
+        });
+    }
+
+    document.getElementById('elevSpinner').style.display = 'inline-block';
+    document.getElementById('elevInfo').textContent = 'Loading...';
+
+    try {
+        const BATCH = 100;
+        const results = [];
+        for (let b = 0; b < points.length; b += BATCH) {
+            if (b > 0) await new Promise(r => setTimeout(r, 150));
+            if (signal.aborted) return;
+            const chunk = points.slice(b, b + BATCH);
+            try {
+                const res = await fetch('https://api.open-elevation.com/api/v1/lookup', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ locations: chunk }),
+                    signal
+                });
+                const data = await res.json();
+                if (data && data.results) {
+                    for (let j = 0; j < data.results.length; j++) {
+                        results.push({ dist: startDist + (b + j) * stepKm, ele: data.results[j].elevation });
+                    }
+                }
+            } catch (e) {
+                if (e.name === 'AbortError') return;
+                console.error('Elevation batch fetch error:', e);
+            }
+        }
+        if (results.length > 0) {
+            if (routeElevationData.length > 0) {
+                const lastDist = routeElevationData[routeElevationData.length - 1].dist;
+                const filtered = results.filter(r => r.dist > lastDist + 0.00001);
+                routeElevationData.push(...filtered);
+            } else {
+                routeElevationData.push(...results);
+            }
+            _elevWaiting = false;
+        }
+    } catch (err) {
+        console.error('Elevation fetch error:', err);
+        _elevWaiting = false;
+    } finally {
+        document.getElementById('elevSpinner').style.display = 'none';
+        drawElevProfile();
+    }
 }
 
 function getElevation(distKm) {

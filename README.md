@@ -13,7 +13,7 @@ Built with [Leaflet](https://leafletjs.com).
 - **Custom points** — place labeled purple markers anywhere on the map (not tracked during animation, useful for landmarks)
 - **Uphill auto-slowdown** — speed decreases proportionally on uphill sections (up to 50% at 14° slope or steeper); slope is computed from elevation data
 - **Sun widget** — first-person sky view with compass rose, heading arrow, sun position, and realistic sky colors; full-day sun trajectory on compass and sky; sun icon moves across the sky from sunrise to sunset; compass path shows how the sun arcs through the day
-- **Elevation profile** — route elevation chart with high-resolution data (sampled every 2 meters); auto-switches between metric and imperial units; smooth profile line with moving-average filtering
+- **Elevation profile** — route elevation chart sampled every 30 meters (matches SRTM source resolution); auto-switches between metric and imperial units; smooth profile line with moving-average filtering
 - **112 alarms** — two call notifications at 16:39 and 16:51 with red markers on the route and a fading banner
 - **Save / Load / Export / Import** — routes and settings persist in your browser's storage and can be backed up as `.json` files; export includes your speed unit, map layer, and other preferences
 - **Follow mode** — map auto-pans to keep the moving marker centered
@@ -149,21 +149,13 @@ An 800×180 canvas showing the elevation along your route:
 - A small spinner appears while data is loading
 - Click **▼** to collapse, **▲** to expand
 
-Elevation data is fetched from the free [Open-Elevation API](https://api.open-elevation.com) every **2 meters** along the route — not just at waypoints. This gives a detailed, accurate profile even for routes with sparse waypoints. Because the API has a per-request limit, the data is fetched in batches with a small delay between them to be respectful to the service.
+Elevation data is fetched from the free [Open-Elevation API](https://api.open-elevation.com) every **30 meters** along the route — matching the native resolution of the underlying SRTM digital elevation model. Sampling at a higher density would provide no additional accuracy while wasting API calls. Because the API has a per-request limit, the data is fetched in batches with a small delay between them to be respectful to the service.
 
-The data is saved with the route so loading is instant next time. If you load an older route saved before this feature was added (sparse elevation data), the app will automatically re-fetch at the higher resolution and update the saved route.
+Adding a new waypoint fetches elevation only for the new segment, not the entire route. Undoing a waypoint simply trims the existing elevation data — no API call at all. Full re-fetch only happens when loading a saved route or when elevation data is missing.
+
+The data is saved with the route so loading is instant next time. If you load an older route saved before elevation data was included, or one with sparse data, the app will automatically re-fetch and update the saved route.
 
 The profile line is gently smoothed to remove the natural stair-step pattern of the digital elevation model, while preserving actual terrain features like hills and valleys.
-
-### Map markers guide
-
-- 🔵 **Blue dots** — route waypoints (vertices)
-- 🟠 **Orange circles** — stop points (pauses during animation)
-- 🟢 **Green circles** — speed points (speed changes)
-- 🟣 **Purple circles** — custom markers (visual only)
-- 🔴 **Red circles** — 112 call alarm points
-- 5️⃣0️⃣8️⃣ **Red teardrop** — reference point "508"
-- 🔴 **Hollow red circles** — permanent landmarks (Kris shorts, Backpack)
 
 ## Data sources
 
