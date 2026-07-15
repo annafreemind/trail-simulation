@@ -17,7 +17,7 @@ Built with [Leaflet](https://leafletjs.com).
 - **112 alarms** — two call notifications at 16:39 and 16:51 with red markers on the route and a fading banner
 - **Save / Load / Export / Import** — routes and settings persist in your browser's storage and can be backed up as `.json` files; export includes your speed unit, map layer, and other preferences
 - **Follow mode** — map auto-pans to keep the moving marker centered
-- **Map layers** — switch between OpenStreetMap and OpenTopoMap
+- **Map layers** — switch between OpenStreetMap, OpenTopoMap, and Esri satellite imagery
 - **Help modal** — opens this README in-app
 
 ## How to run
@@ -159,7 +159,7 @@ The profile line is gently smoothed to remove the natural stair-step pattern of 
 
 ## Data sources
 
-- **Map tiles**: [OpenStreetMap](https://openstreetmap.org) and [OpenTopoMap](https://opentopomap.org)
+- **Map tiles**: [OpenStreetMap](https://openstreetmap.org), [OpenTopoMap](https://opentopomap.org), and [Esri World Imagery](https://www.arcgis.com/home/item.html?id=10df2279f9684e4a9f6a7f08febac2a9)
 - **Elevation**: [Open-Elevation API](https://api.open-elevation.com)
 - **Sun position**: pre-computed with [astral](https://astral.readthedocs.io/) for Boquete, Panama (8.843°N, 82.425°W), April 1 2014, UTC−5, 5-minute intervals
 - **Weather**: [Open-Meteo Archive API](https://open-meteo.com/en/docs/historical-weather-api) (ERA5 reanalysis) — historical temperature, wind, cloud cover, and solar radiation for Boquete, April 1 2014, hourly
