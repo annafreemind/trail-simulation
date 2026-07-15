@@ -126,7 +126,7 @@ Two alarm points are configured at **16:39** and **16:51**. When the simulated t
 
 A 400×300 canvas showing the sky as you would see it facing the current heading:
 
-- **Sky** — colors change throughout the day based on sun elevation: bright blue during daylight, warm yellows and oranges at sunset, deep purple at twilight, dark blue at night
+- **Sky** — colors driven by three data sources: (1) **sun elevation** — controls hue: bright blue by day, orange at sunset, dark blue at night; (2) **solar radiation** — historical ERA5 data (W/m²) for Boquete, April 1 2014: brightness dims as radiation drops, not just by sun angle; (3) **sun azimuth** — a subtle dark shadow on the side opposite the sun, visible when the sun is below 30° elevation
 - **Sun in the sky** — a glowing sun icon moves across the sky from right (east, sunrise) to left (west, sunset); its height matches the actual sun elevation in degrees — low on the horizon at dawn, high overhead at noon
 - **Sun trajectory** — a subtle dashed line traces the sun's full daily path through the sky, showing how it rises, climbs, and descends
 - **Compass** — a circle with cardinal directions (N/E/S/W); a red arrow shows the current heading

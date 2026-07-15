@@ -97,24 +97,26 @@ const topoLayer = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png'
     attribution: '&copy; <a href="https://opentopomap.org">OpenTopoMap</a> contributors',
 });
 topoLayer.on('tileerror', (e) => {
-    // retry failed tiles once
     if (!e.tile._retried) {
         e.tile._retried = true;
         setTimeout(() => e.tile.src = e.tile.src, 500);
     }
 });
 
+const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+    maxZoom: 19,
+    attribution: '&copy; Esri, Maxar, Earthstar Geographics, and the GIS User Community',
+});
+
 let currentLayer = osmLayer;
 
 document.getElementById('mapLayer').addEventListener('change', function() {
-    if (this.value === 'topo' && currentLayer !== topoLayer) {
+    const layerMap = { osm: osmLayer, topo: topoLayer, satellite: satelliteLayer };
+    const newLayer = layerMap[this.value];
+    if (newLayer && newLayer !== currentLayer) {
         map.removeLayer(currentLayer);
-        topoLayer.addTo(map);
-        currentLayer = topoLayer;
-    } else if (this.value === 'osm' && currentLayer !== osmLayer) {
-        map.removeLayer(currentLayer);
-        osmLayer.addTo(map);
-        currentLayer = osmLayer;
+        newLayer.addTo(map);
+        currentLayer = newLayer;
     }
     if (waypoints.length >= 2) {
         map.fitBounds(L.latLngBounds(waypoints), { padding: [50, 50] });
@@ -1299,11 +1301,16 @@ function lerp3(a, b, t) {
     return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
 }
 
-function skyColorAt(elev) {
+function skyColorAt(elev, radiation) {
     const clamped = Math.max(-12, Math.min(50, elev));
-    const dayFactor = Math.max(0, Math.min(1, (clamped + 3) / 20));
+    const elevFactor = Math.max(0, Math.min(1, (clamped + 8) / 30));
+    const maxRad = 995; // peak shortwave_radiation for this location/date
+    const radFactor = radiation !== undefined
+        ? Math.max(0, Math.min(1, radiation / maxRad))
+        : elevFactor;
+    const dayFactor = radFactor * 0.75 + elevFactor * 0.25;
     const warmFactor = smoothstep(0, 12, Math.max(0, 12 - Math.abs(clamped)));
-    const warmth = warmFactor * (1 - dayFactor * 0.7);
+    const warmth = warmFactor * (1 - Math.max(dayFactor, radFactor) * 0.7);
 
     const nightTop = [2, 2, 18];
     const nightHor = [1, 1, 14];
@@ -1338,6 +1345,18 @@ function getSunAt(date) {
         elev: row[2] + (next[2] - row[2]) * t,
         azim: row[3] + (next[3] - row[3]) * t
     };
+}
+
+function getWeatherAt(date) {
+    const fracHour = date.getHours() + date.getMinutes() / 60;
+    const idx = Math.max(0, Math.min(Math.floor(fracHour), 22));
+    const t = Math.max(0, Math.min(1, fracHour - idx));
+    const nextIdx = Math.min(idx + 1, 23);
+    const result = {};
+    for (const key of ['temperature','humidity','precipitation','windSpeed','windDir','cloudCover','radiation','weatherCode']) {
+        result[key] = weatherData[key][idx] + (weatherData[key][nextIdx] - weatherData[key][idx]) * t;
+    }
+    return result;
 }
 
 function lerpColor(a, b, t) {
@@ -1386,17 +1405,40 @@ let viewDir = 0;
         return (aa - la) / (ra + 360 - la);
     }
 
-    // sky colors — interpolate from hand-tuned keyframes
-    const { top: skyTop, hor: skyHor } = skyColorAt(elev);
+    // sky colors — interpolate from hand-tuned keyframes, dimmed by radiation
+    const weather = getWeatherAt(date);
+    const { top: skyTop, hor: skyHor } = skyColorAt(elev, weather.radiation);
 
     sunCtx.clearRect(0, 0, W, H);
 
-    // gradient sky
-    const grad = sunCtx.createLinearGradient(0, 0, 0, horizonY);
-    grad.addColorStop(0, rgb(skyTop));
-    grad.addColorStop(1, rgb(skyHor));
-    sunCtx.fillStyle = grad;
+    // sun canvas position — used for gradient and sun icon
+    const sunFrac = Math.max(0, Math.min(1, 1 - (sun.azim - 70) / 220));
+    const sunCanvasX = W * sunFrac;
+    const sunCanvasY = horizonY * (1 - Math.max(0, sun.elev) / 90);
+
+    // sky — vertical gradient with shadow opposite sun (strongest near horizon)
+    {
+        const baseGrad = sunCtx.createLinearGradient(0, 0, 0, horizonY);
+        baseGrad.addColorStop(0, rgb(skyTop));
+        baseGrad.addColorStop(1, rgb(skyHor));
+        sunCtx.fillStyle = baseGrad;
+    }
     sunCtx.fillRect(0, 0, W, horizonY);
+    {
+        const shadowStr = Math.max(0, Math.min(1, 1 - Math.abs(sun.elev) / 30));
+        const shadowAlpha = 0.24 * shadowStr;
+        if (shadowAlpha > 0.02) {
+            const shadowX = sunCanvasX < W / 2 ? W : 0;
+            const shadowR = Math.max(W, horizonY) * 0.65;
+            const shadowGrad = sunCtx.createRadialGradient(shadowX, horizonY * 0.42, 0, shadowX, horizonY * 0.42, shadowR);
+            shadowGrad.addColorStop(0, 'rgba(8,12,40,' + shadowAlpha.toFixed(3) + ')');
+            shadowGrad.addColorStop(0.35, 'rgba(8,12,40,' + (shadowAlpha * 0.5).toFixed(3) + ')');
+            shadowGrad.addColorStop(0.7, 'rgba(8,12,40,' + (shadowAlpha * 0.15).toFixed(3) + ')');
+            shadowGrad.addColorStop(1, 'rgba(0,0,0,0)');
+            sunCtx.fillStyle = shadowGrad;
+            sunCtx.fillRect(0, 0, W, horizonY);
+        }
+    }
 
     // full-day sun trajectory on the sky
     const skyPathPoints = [];
@@ -1427,13 +1469,10 @@ let viewDir = 0;
         const alpha = sun.elev < 0 ? 1 + sun.elev / 6 : 1;
         sunCtx.save();
         sunCtx.globalAlpha = alpha;
-        const sunFrac = Math.max(0, Math.min(1, 1 - (sun.azim - 70) / 220));
-        const skyX = W * sunFrac;
-        const skyY = horizonY * (1 - Math.max(0, sun.elev) / 90);
         // glow
         sunCtx.fillStyle = 'rgba(255,220,80,0.15)';
         sunCtx.beginPath();
-        sunCtx.arc(skyX, skyY, 14, 0, Math.PI * 2);
+        sunCtx.arc(sunCanvasX, sunCanvasY, 14, 0, Math.PI * 2);
         sunCtx.fill();
         // rays
         sunCtx.strokeStyle = 'rgba(255,210,60,0.6)';
@@ -1441,18 +1480,18 @@ let viewDir = 0;
         for (let r = 0; r < 8; r++) {
             const ra = r * Math.PI / 4;
             sunCtx.beginPath();
-            sunCtx.moveTo(skyX + Math.cos(ra) * 8, skyY + Math.sin(ra) * 8);
-            sunCtx.lineTo(skyX + Math.cos(ra) * 13, skyY + Math.sin(ra) * 13);
+            sunCtx.moveTo(sunCanvasX + Math.cos(ra) * 8, sunCanvasY + Math.sin(ra) * 8);
+            sunCtx.lineTo(sunCanvasX + Math.cos(ra) * 13, sunCanvasY + Math.sin(ra) * 13);
             sunCtx.stroke();
         }
         // body
-        const skyGrad = sunCtx.createRadialGradient(skyX - 1, skyY - 1, 0, skyX, skyY, 7);
+        const skyGrad = sunCtx.createRadialGradient(sunCanvasX - 1, sunCanvasY - 1, 0, sunCanvasX, sunCanvasY, 7);
         skyGrad.addColorStop(0, '#fff8c0');
         skyGrad.addColorStop(0.5, '#ffe066');
         skyGrad.addColorStop(1, 'rgba(255,180,40,0.7)');
         sunCtx.fillStyle = skyGrad;
         sunCtx.beginPath();
-        sunCtx.arc(skyX, skyY, 7, 0, Math.PI * 2);
+        sunCtx.arc(sunCanvasX, sunCanvasY, 7, 0, Math.PI * 2);
         sunCtx.fill();
         sunCtx.restore();
     }
@@ -1504,8 +1543,8 @@ let viewDir = 0;
     sunCtx.stroke();
     sunCtx.shadowBlur = 0;
 
-    // ground
-    const groundBr = Math.max(0, Math.min(1, (elev + 3) / 13));
+    // ground — dim with radiation, same as sky
+    const groundBr = Math.max(0, Math.min(1, weather.radiation / 995));
     sunCtx.fillStyle = `rgba(${Math.round(10 + 30 * groundBr)},${Math.round(15 + 40 * groundBr)},${Math.round(10 + 30 * groundBr)},1)`;
     sunCtx.fillRect(0, horizonY, W, sh - horizonY);
 
