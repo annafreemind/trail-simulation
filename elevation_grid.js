@@ -15,16 +15,9 @@ const ELEV_GRID_LNG0 = -82.55527778;   // west edge
 const ELEV_GRID_STEP = 0.0002777778;  // degrees per pixel (~30m)
 
 function getElevationFromGrid(lat, lng) {
-    const r = (ELEV_GRID_LAT0 - lat) / ELEV_GRID_STEP;  // row increases southward
-    const c = (lng - ELEV_GRID_LNG0) / ELEV_GRID_STEP;
-    if (r < 0 || r >= ELEV_GRID_ROWS - 1 || c < 0 || c >= ELEV_GRID_COLS - 1) return null;
-    const r0 = Math.floor(r), r1 = r0 + 1;
-    const c0 = Math.floor(c), c1 = c0 + 1;
-    const fr = r - r0, fc = c - c0;
-    const v00 = ELEV_GRID[r0 * ELEV_GRID_COLS + c0];
-    const v10 = ELEV_GRID[r1 * ELEV_GRID_COLS + c0];
-    const v01 = ELEV_GRID[r0 * ELEV_GRID_COLS + c1];
-    const v11 = ELEV_GRID[r1 * ELEV_GRID_COLS + c1];
-    if (v00 <= -32768 || v10 <= -32768 || v01 <= -32768 || v11 <= -32768) return null;
-    return (v00 * (1 - fr) + v10 * fr) * (1 - fc) + (v01 * (1 - fr) + v11 * fr) * fc;
+    const r = Math.round((ELEV_GRID_LAT0 - lat) / ELEV_GRID_STEP);
+    const c = Math.round((lng - ELEV_GRID_LNG0) / ELEV_GRID_STEP);
+    if (r < 0 || r >= ELEV_GRID_ROWS || c < 0 || c >= ELEV_GRID_COLS) return null;
+    const v = ELEV_GRID[r * ELEV_GRID_COLS + c];
+    return v > -32768 ? v : null;
 }

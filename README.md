@@ -147,13 +147,11 @@ An 800×180 canvas showing the elevation along your route:
 - **Sidebar info** — current elevation in the Navigation tab
 - Click **▼** to collapse, **▲** to expand
 
-Elevation data comes from the SRTM1 digital elevation model (NASA, 30 m resolution), pre-packaged as a local grid covering a 30×30 km area around Boquete (~1.8 MB). Lookups are instantaneous — no API calls, no loading spinners, no dependency on external services. Elevation for any sampled point is computed via bilinear interpolation from the grid.
+Elevation data comes from the SRTM1 digital elevation model (NASA, 30 m resolution), downloaded from `s3://elevation-tiles-prod/skadi/N08/N08W083.hgt.gz` and pre-packaged as a local grid covering a 30×30 km area around Boquete (~1.8 MB). Lookups are instantaneous — no API calls, no loading spinners, no dependency on external services. Each sampled point snaps to the nearest grid cell (no interpolation overhead).
 
-Adding a new waypoint fetches elevation only for the new segment, not the entire route. Undoing a waypoint simply trims the existing elevation data — no API call at all. Full re-fetch only happens when loading a saved route or when elevation data is missing.
+Adding or removing waypoints rebuilds the elevation profile locally from the grid in milliseconds. Elevation data is saved with the route for instant loading next time.
 
-The data is saved with the route so loading is instant next time. If you load an older route saved before elevation data was included, or one with sparse data, the app will automatically re-fetch and update the saved route.
-
-The profile line is gently smoothed to remove the natural stair-step pattern of the digital elevation model, while preserving actual terrain features like hills and valleys.
+The profile line is smoothed with a 15 m sliding window — enough to remove SRTM stair-stepping without flattening real terrain features.
 
 ## Data sources
 

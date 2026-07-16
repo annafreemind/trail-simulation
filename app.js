@@ -141,12 +141,12 @@ L.rectangle([[8.705, -82.555], [8.975, -82.285]], {
     interactive: false,
 }).addTo(map);
 
-L.marker([8.985, -82.42], {
+L.marker([8.975, -82.42], {
     icon: L.divIcon({
         className: '',
-        html: '<div style="white-space:nowrap;color:#e74c3c;font-size:11px;text-shadow:0 0 4px #000,0 0 4px #000">Elevation data coverage (SRTM1, 30×30 km)</div>',
-        iconSize: [0, 0],
-        iconAnchor: [-140, 5],
+        html: '<div style="text-align:center;color:#e74c3c;font-size:13px;font-weight:600">Elevation data coverage (SRTM1, 30×30 km)</div>',
+        iconSize: [350, 20],
+        iconAnchor: [175, 20],
     }),
     interactive: false,
 }).addTo(map);
@@ -1881,9 +1881,9 @@ function drawElevProfile() {
         elevCtx.fillText(formatDistance(dist), x, H - pad.bottom + 6);
     }
 
-    // profile path — with sliding-window smoothing (50m half-window)
+    // profile path — with sliding-window smoothing (15m half-window)
     const smoothed = [];
-    const SMOOTH_KM = 0.05;
+    const SMOOTH_KM = 0.015;
     let winStart = 0, winEnd = 0, winSum = 0;
     for (let i = 0; i < routeElevationData.length; i++) {
         const d = routeElevationData[i].dist;
