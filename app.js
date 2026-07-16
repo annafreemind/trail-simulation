@@ -132,6 +132,25 @@ L.marker([8.842428, -82.425013], {
     zIndexOffset: 500,
 }).addTo(map);
 
+// elevation grid coverage — 30×30 km around Boquete
+L.rectangle([[8.705, -82.555], [8.975, -82.285]], {
+    color: '#e74c3c',
+    weight: 1.5,
+    fillOpacity: 0,
+    dashArray: '6 4',
+    interactive: false,
+}).addTo(map);
+
+L.marker([8.985, -82.42], {
+    icon: L.divIcon({
+        className: '',
+        html: '<div style="white-space:nowrap;color:#e74c3c;font-size:11px;text-shadow:0 0 4px #000,0 0 4px #000">Elevation data coverage (SRTM1, 30×30 km)</div>',
+        iconSize: [0, 0],
+        iconAnchor: [-140, 5],
+    }),
+    interactive: false,
+}).addTo(map);
+
 L.circleMarker([8.878563, -82.408597], {
     radius: 14,
     color: '#e74c3c',
