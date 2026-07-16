@@ -1821,23 +1821,22 @@ async function refreshElevations() {
             routeElevationData = allResults;
             _elevWaiting = false;
             drawElevProfile();
-            document.getElementById('elevSpinner').style.display = 'none';
         } else {
             routeElevationData = [];
             _elevWaiting = false;
             drawElevProfile();
-            document.getElementById('elevSpinner').style.display = 'none';
         }
     } catch (err) {
         console.error('Elevation fetch error:', err);
         _elevWaiting = false;
-        document.getElementById('elevSpinner').style.display = 'none';
         if (routeElevationData.length >= 2) {
             drawElevProfile();
         } else {
             document.getElementById('elevInfo').textContent = 'Failed';
             document.getElementById('infoElevation').textContent = '—';
         }
+    } finally {
+        document.getElementById('elevSpinner').style.display = 'none';
     }
 }
 
