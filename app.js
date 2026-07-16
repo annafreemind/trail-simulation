@@ -1749,6 +1749,33 @@ const elevCtx = elevCanvas.getContext('2d');
 
 let _elevAbort = null;
 
+async function fetchElevationBatch(chunk, signal) {
+    // try OpenTopoData first (SRTM30, 30m resolution)
+    try {
+        const locStr = chunk.map(p => p.latitude + ',' + p.longitude).join('|');
+        const url = 'https://api.opentopodata.org/v1/srtm30m?locations=' + encodeURIComponent(locStr);
+        const res = await fetch(url, { signal });
+        const data = await res.json();
+        if (data && data.status === 'OK' && data.results && data.results.length > 0) {
+            return data.results.map(r => r.elevation);
+        }
+    } catch (e) {
+        if (e.name === 'AbortError') throw e;
+    }
+    // fallback to Open-Elevation
+    const res = await fetch('https://api.open-elevation.com/api/v1/lookup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ locations: chunk }),
+        signal
+    });
+    const data = await res.json();
+    if (data && data.results) {
+        return data.results.map(r => r.elevation);
+    }
+    throw new Error('All elevation APIs failed');
+}
+
 async function refreshElevations() {
     if (_elevAbort) _elevAbort.abort();
     _elevAbort = new AbortController();
@@ -1792,24 +1819,16 @@ async function refreshElevations() {
             segPos += stepKm;
         }
 
-        const BATCH = 100;
+        const BATCH = 50;
         const allResults = [];
         for (let b = 0; b < points.length; b += BATCH) {
             if (b > 0) await new Promise(r => setTimeout(r, 150));
             if (signal.aborted) return;
             const chunk = points.slice(b, b + BATCH);
             try {
-                const res = await fetch('https://api.open-elevation.com/api/v1/lookup', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ locations: chunk }),
-                    signal
-                });
-                const data = await res.json();
-                if (data && data.results) {
-                    for (let j = 0; j < data.results.length; j++) {
-                        allResults.push({ dist: dists[b + j], ele: data.results[j].elevation });
-                    }
+                const elevations = await fetchElevationBatch(chunk, signal);
+                for (let j = 0; j < elevations.length; j++) {
+                    allResults.push({ dist: dists[b + j], ele: elevations[j] });
                 }
             } catch (e) {
                 if (e.name === 'AbortError') return;
@@ -1873,24 +1892,16 @@ async function appendLastSegmentElevation() {
     document.getElementById('elevInfo').textContent = 'Loading...';
 
     try {
-        const BATCH = 100;
+        const BATCH = 50;
         const results = [];
         for (let b = 0; b < points.length; b += BATCH) {
             if (b > 0) await new Promise(r => setTimeout(r, 150));
             if (signal.aborted) return;
             const chunk = points.slice(b, b + BATCH);
             try {
-                const res = await fetch('https://api.open-elevation.com/api/v1/lookup', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ locations: chunk }),
-                    signal
-                });
-                const data = await res.json();
-                if (data && data.results) {
-                    for (let j = 0; j < data.results.length; j++) {
-                        results.push({ dist: startDist + (b + j) * stepKm, ele: data.results[j].elevation });
-                    }
+                const elevations = await fetchElevationBatch(chunk, signal);
+                for (let j = 0; j < elevations.length; j++) {
+                    results.push({ dist: startDist + (b + j) * stepKm, ele: elevations[j] });
                 }
             } catch (e) {
                 if (e.name === 'AbortError') return;
