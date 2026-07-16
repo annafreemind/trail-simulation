@@ -1901,7 +1901,6 @@ async function appendLastSegmentElevation() {
                     results.push({ dist: startDist + (b + j) * stepKm, ele: elevations[j] });
                 }
                 _elevProvider = provider;
-                }
             } catch (e) {
                 if (e.name === 'AbortError') return;
                 console.error('Elevation batch fetch error:', e);
