@@ -112,7 +112,7 @@ When enabled (checked by default in the Navigation tab), the simulation detects 
 
 The formula: `effective = base × max(0.5, 1 − slope°/28)`
 
-Slope is computed from elevation data fetched from the [OpenTopoData API](https://api.opentopodata.org). Downhill sections are not affected — only uphill slopes slow you down. When elevation data is still loading, the current speed shows "Loading elevation…" and the movement runs at full base speed until data is ready.
+Slope is computed from elevation data fetched from the [Open-Elevation API](https://api.open-elevation.com). Downhill sections are not affected — only uphill slopes slow you down. When elevation data is still loading, the current speed shows "Loading elevation…" and the movement runs at full base speed until data is ready.
 
 Hover over the **`?`** icon next to the checkbox for a quick summary.
 
@@ -147,7 +147,7 @@ An 800×180 canvas showing the elevation along your route:
 - **Sidebar info** — current elevation in the Navigation tab
 - Click **▼** to collapse, **▲** to expand
 
-Elevation data is fetched from the free [OpenTopoData API](https://api.opentopodata.org) (SRTM30 dataset, 30 m resolution) every **30 meters** along the route. If OpenTopoData is unavailable, the app falls back to [Open-Elevation](https://api.open-elevation.com). Sampling is batched with a small delay between requests to be respectful to the services.
+Elevation data is fetched from the free [Open-Elevation API](https://api.open-elevation.com) every **30 meters** along the route — matching the native resolution of the underlying SRTM digital elevation model. Sampling is batched with a small delay between requests to be respectful to the service.
 
 Adding a new waypoint fetches elevation only for the new segment, not the entire route. Undoing a waypoint simply trims the existing elevation data — no API call at all. Full re-fetch only happens when loading a saved route or when elevation data is missing.
 
@@ -158,6 +158,6 @@ The profile line is gently smoothed to remove the natural stair-step pattern of 
 ## Data sources
 
 - **Map tiles**: [OpenStreetMap](https://openstreetmap.org), [OpenTopoMap](https://opentopomap.org), and [Esri World Imagery](https://www.arcgis.com/home/item.html?id=10df2279f9684e4a9f6a7f08febac2a9)
-- **Elevation**: [OpenTopoData API](https://api.opentopodata.org) (SRTM30) with [Open-Elevation API](https://api.open-elevation.com) fallback
+- **Elevation**: [Open-Elevation API](https://api.open-elevation.com)
 - **Sun position**: pre-computed with [astral](https://astral.readthedocs.io/) for Boquete, Panama (8.843°N, 82.425°W), April 1 2014, UTC−5, 5-minute intervals
 - **Weather**: [Open-Meteo Archive API](https://open-meteo.com/en/docs/historical-weather-api) (ERA5 reanalysis) — historical temperature, wind, cloud cover, and solar radiation for Boquete (8.84°N, 82.42°W), April 1 2014, hourly; spatial resolution ~28×28 km (0.25° grid), temperature accuracy ±1–2°C, cloud cover lower accuracy in tropics

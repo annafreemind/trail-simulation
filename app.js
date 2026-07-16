@@ -1752,19 +1752,6 @@ const elevCtx = elevCanvas.getContext('2d');
 let _elevAbort = null;
 
 async function fetchElevationBatch(chunk, signal) {
-    // try OpenTopoData first (SRTM30, 30m resolution)
-    try {
-        const locStr = chunk.map(p => p.latitude + ',' + p.longitude).join('|');
-        const url = 'https://api.opentopodata.org/v1/srtm30m?locations=' + encodeURIComponent(locStr);
-        const res = await fetch(url, { signal });
-        const data = await res.json();
-        if (data && data.status === 'OK' && data.results && data.results.length > 0) {
-            return { elevations: data.results.map(r => r.elevation), provider: 'OpenTopoData' };
-        }
-    } catch (e) {
-        if (e.name === 'AbortError') throw e;
-    }
-    // fallback to Open-Elevation
     const res = await fetch('https://api.open-elevation.com/api/v1/lookup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1775,7 +1762,7 @@ async function fetchElevationBatch(chunk, signal) {
     if (data && data.results) {
         return { elevations: data.results.map(r => r.elevation), provider: 'Open-Elevation' };
     }
-    throw new Error('All elevation APIs failed');
+    throw new Error('Elevation API returned no data');
 }
 
 async function refreshElevations() {
