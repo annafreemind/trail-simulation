@@ -114,12 +114,12 @@ document.getElementById('mapLayer').addEventListener('change', function() {
     const layerMap = { osm: osmLayer, topo: topoLayer, satellite: satelliteLayer };
     const newLayer = layerMap[this.value];
     if (newLayer && newLayer !== currentLayer) {
+        const center = map.getCenter();
+        const zoom = map.getZoom();
         map.removeLayer(currentLayer);
         newLayer.addTo(map);
         currentLayer = newLayer;
-    }
-    if (waypoints.length >= 2) {
-        map.fitBounds(L.latLngBounds(waypoints), { padding: [50, 50] });
+        map.setView(center, Math.min(zoom, newLayer.options.maxZoom));
     }
     localStorage.setItem('trail_settings', JSON.stringify({ mapLayer: this.value }));
 });
