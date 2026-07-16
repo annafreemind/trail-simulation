@@ -74,6 +74,7 @@ let routeElevationData = [];
 let elevationHistory = [];
 let _lastRecordedMinute = -1;
 let _elevTimer = null;
+let _elevFailed = false;
 
 // ============================================================
 //   Map
@@ -1848,10 +1849,12 @@ async function refreshElevations() {
     } catch (err) {
         console.error('Elevation fetch error:', err);
         _elevWaiting = false;
-        document.getElementById('elevInfo').textContent = 'API error';
+        document.getElementById('elevSpinner').style.display = 'none';
         if (routeElevationData.length >= 2) {
             drawElevProfile();
         } else {
+            drawElevProfile();
+            document.getElementById('elevInfo').textContent = 'API error';
             document.getElementById('infoElevation').textContent = '—';
         }
     } finally {
@@ -1921,10 +1924,14 @@ async function appendLastSegmentElevation() {
     } catch (err) {
         console.error('Elevation fetch error:', err);
         _elevWaiting = false;
-        document.getElementById('elevInfo').textContent = 'API error';
+        _elevFailed = true;
     } finally {
         document.getElementById('elevSpinner').style.display = 'none';
         drawElevProfile();
+        if (_elevFailed && routeElevationData.length < 2) {
+            document.getElementById('elevInfo').textContent = 'API error';
+        }
+        _elevFailed = false;
     }
 }
 
