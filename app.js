@@ -1848,10 +1848,10 @@ async function refreshElevations() {
     } catch (err) {
         console.error('Elevation fetch error:', err);
         _elevWaiting = false;
+        document.getElementById('elevInfo').textContent = 'API error';
         if (routeElevationData.length >= 2) {
             drawElevProfile();
         } else {
-            document.getElementById('elevInfo').textContent = 'Failed';
             document.getElementById('infoElevation').textContent = '—';
         }
     } finally {
@@ -1921,6 +1921,7 @@ async function appendLastSegmentElevation() {
     } catch (err) {
         console.error('Elevation fetch error:', err);
         _elevWaiting = false;
+        document.getElementById('elevInfo').textContent = 'API error';
     } finally {
         document.getElementById('elevSpinner').style.display = 'none';
         drawElevProfile();
