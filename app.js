@@ -54,7 +54,6 @@ let _112PointMarkers = [];
 let _prevSimSec = -1;
 let _smoothViewDir = 0;
 let _slopeDeg = 0;
-let _elevWaiting = false;
 let scheduledStops = [];
 let scheduledStopMarkers = [];
 let isAddingStops = false;
@@ -73,9 +72,6 @@ let isAddingCustomPoints = false;
 let routeElevationData = [];
 let elevationHistory = [];
 let _lastRecordedMinute = -1;
-let _elevTimer = null;
-let _elevFailed = false;
-let _elevProvider = '';
 
 // ============================================================
 //   Map
@@ -400,7 +396,7 @@ map.on('click', (e) => {
     updateInfo();
     updateStartButton();
     setStatus(`Waypoint ${waypoints.length} added`, '');
-    appendLastSegmentElevation();
+    buildElevationData();
 });
 
 // ============================================================
@@ -460,8 +456,6 @@ btnClear.addEventListener('click', () => {
 
 btnUndo.addEventListener('click', () => {
     if (waypoints.length === 0) return;
-    if (_elevTimer) { clearTimeout(_elevTimer); _elevTimer = null; }
-    if (_elevAbort) _elevAbort.abort();
     waypoints.pop();
     if (waypoints.length < 2 && polyline) {
         map.removeLayer(polyline);
@@ -846,15 +840,12 @@ function animationLoop(timestamp) {
     const speed = getSpeedKmh();
     let effectiveSpeed = speed;
     _slopeDeg = 0;
-    _elevWaiting = false;
     if (document.getElementById('chkUphill').checked) {
         if (routeElevationData.length >= 2) {
             _slopeDeg = computeSlope(traveledDistanceKm, totalDistanceKm);
             if (_slopeDeg > 0) {
                 effectiveSpeed = speed * Math.max(0.5, 1 - _slopeDeg / 28);
             }
-        } else {
-            _elevWaiting = true;
         }
     }
     const speedKmPerSec = effectiveSpeed / 3600;
@@ -941,9 +932,7 @@ function animationLoop(timestamp) {
         setStatus('Route completed — timer running', 'active');
     }
 
-    if (_elevWaiting) {
-        infoCurrentSpeed.textContent = 'Loading elevation\u2026';
-    } else if (_slopeDeg > 0) {
+    if (_slopeDeg > 0) {
         infoCurrentSpeed.textContent = formatSpeed(effectiveSpeed) + '  \u2191' + _slopeDeg.toFixed(0) + '\u00b0';
     } else {
         infoCurrentSpeed.textContent = formatSpeed(getSpeedKmh());
@@ -1198,11 +1187,9 @@ async function loadRoute(name) {
     if (data.elevationData && data.elevationData.length >= 2) {
         routeElevationData = data.elevationData.map(d => ({ dist: d.dist, ele: d.ele }));
         drawElevProfile();
-        if (routeElevationData.length <= waypoints.length + 5) {
-            refreshElevations().then(() => saveElevData(name));
-        }
     } else {
-        refreshElevations().then(() => saveElevData(name));
+        buildElevationData();
+        if (routeElevationData.length >= 2) saveElevData(name);
     }
 }
 
@@ -1749,187 +1736,39 @@ document.getElementById('elevViewToggle').addEventListener('click', function () 
 const elevCanvas = document.getElementById('elevView');
 const elevCtx = elevCanvas.getContext('2d');
 
-let _elevAbort = null;
-
-async function fetchElevationBatch(chunk, signal) {
-    const res = await fetch('https://api.open-elevation.com/api/v1/lookup', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ locations: chunk }),
-        signal
-    });
-    const data = await res.json();
-    if (data && data.results) {
-        return { elevations: data.results.map(r => r.elevation), provider: 'Open-Elevation' };
-    }
-    throw new Error('Elevation API returned no data');
-}
-
-async function refreshElevations() {
-    if (_elevAbort) _elevAbort.abort();
-    _elevAbort = new AbortController();
-    const signal = _elevAbort.signal;
-    _elevProvider = '';
+function buildElevationData() {
     if (waypoints.length < 2) {
         routeElevationData = [];
         drawElevProfile();
         return;
     }
-    document.getElementById('elevInfo').textContent = 'Loading...';
-    document.getElementById('infoElevation').textContent = '…';
-    document.getElementById('elevSpinner').style.display = 'inline-block';
-    try {
-        const totalDist = pathLength(waypoints);
-        const stepKm = 0.03;
-        const points = [];
-        const dists = [];
-        let d = 0, segIdx = 0, segPos = 0;
-        while (d <= totalDist + 0.0001) {
-            dists.push(d);
-            // find which segment we're on
-            while (segIdx < waypoints.length - 1) {
-                const segLen = haversineKm(waypoints[segIdx], waypoints[segIdx + 1]);
-                if (segPos + 0.0001 >= segLen) {
-                    segPos -= segLen;
-                    segIdx++;
-                } else {
-                    break;
-                }
-            }
-            if (segIdx >= waypoints.length - 1) {
-                points.push({ latitude: waypoints[waypoints.length - 1].lat, longitude: waypoints[waypoints.length - 1].lng });
-            } else {
-                const segLen = haversineKm(waypoints[segIdx], waypoints[segIdx + 1]);
-                const t = segLen > 0 ? segPos / segLen : 0;
-                const lat = waypoints[segIdx].lat + (waypoints[segIdx + 1].lat - waypoints[segIdx].lat) * t;
-                const lng = waypoints[segIdx].lng + (waypoints[segIdx + 1].lng - waypoints[segIdx].lng) * t;
-                points.push({ latitude: lat, longitude: lng });
-            }
-            d += stepKm;
-            segPos += stepKm;
-        }
-
-        const BATCH = 50;
-        const allResults = [];
-        for (let b = 0; b < points.length; b += BATCH) {
-            if (b > 0) await new Promise(r => setTimeout(r, 150));
-            if (signal.aborted) return;
-            const chunk = points.slice(b, b + BATCH);
-            try {
-                const { elevations, provider } = await fetchElevationBatch(chunk, signal);
-                for (let j = 0; j < elevations.length; j++) {
-                    allResults.push({ dist: dists[b + j], ele: elevations[j] });
-                }
-                _elevProvider = provider;
-            } catch (e) {
-                if (e.name === 'AbortError') return;
-                console.error('Elevation batch fetch error:', e);
-            }
-        }
-
-        if (allResults.length >= 2) {
-            routeElevationData = allResults;
-            _elevWaiting = false;
-            drawElevProfile();
-            if (_elevProvider) {
-                document.getElementById('elevInfo').innerHTML += ' <span style=\"color:#556688\">via ' + _elevProvider + '</span>';
-            }
-        } else {
-            routeElevationData = [];
-            _elevWaiting = false;
-            drawElevProfile();
-        }
-    } catch (err) {
-        console.error('Elevation fetch error:', err);
-        _elevWaiting = false;
-        document.getElementById('elevSpinner').style.display = 'none';
-        if (routeElevationData.length >= 2) {
-            drawElevProfile();
-        } else {
-            drawElevProfile();
-            document.getElementById('elevInfo').textContent = 'API error';
-            document.getElementById('infoElevation').textContent = '—';
-        }
-    } finally {
-        document.getElementById('elevSpinner').style.display = 'none';
-    }
-}
-
-function deferElevRefresh() {
-    if (_elevTimer) clearTimeout(_elevTimer);
-    _elevTimer = setTimeout(() => { refreshElevations(); _elevTimer = null; }, 300);
-}
-
-async function appendLastSegmentElevation() {
-    if (waypoints.length < 2) return;
-    if (_elevAbort) _elevAbort.abort();
-    _elevAbort = new AbortController();
-    const signal = _elevAbort.signal;
-    _elevProvider = '';
-
-    const i = waypoints.length - 2;
-    let startDist = 0;
-    for (let j = 0; j < i; j++) startDist += haversineKm(waypoints[j], waypoints[j + 1]);
-
-    const from = waypoints[i];
-    const to = waypoints[i + 1];
-    const segLen = haversineKm(from, to);
+    const totalDist = pathLength(waypoints);
     const stepKm = 0.03;
-    const nPoints = Math.ceil(segLen / stepKm) + 1;
-    const points = [];
-    for (let k = 0; k < nPoints; k++) {
-        const t = Math.min(k * stepKm / (segLen || 1), 1);
-        points.push({
-            latitude: from.lat + (to.lat - from.lat) * t,
-            longitude: from.lng + (to.lng - from.lng) * t
-        });
+    const data = [];
+    let d = 0, segIdx = 0, segPos = 0;
+    while (d <= totalDist + 0.0001) {
+        while (segIdx < waypoints.length - 1) {
+            const segLen = haversineKm(waypoints[segIdx], waypoints[segIdx + 1]);
+            if (segPos + 0.0001 >= segLen) { segPos -= segLen; segIdx++; }
+            else break;
+        }
+        let lat, lng;
+        if (segIdx >= waypoints.length - 1) {
+            lat = waypoints[waypoints.length - 1].lat;
+            lng = waypoints[waypoints.length - 1].lng;
+        } else {
+            const segLen = haversineKm(waypoints[segIdx], waypoints[segIdx + 1]);
+            const t = segLen > 0 ? segPos / segLen : 0;
+            lat = waypoints[segIdx].lat + (waypoints[segIdx + 1].lat - waypoints[segIdx].lat) * t;
+            lng = waypoints[segIdx].lng + (waypoints[segIdx + 1].lng - waypoints[segIdx].lng) * t;
+        }
+        const ele = getElevationFromGrid(lat, lng);
+        if (ele !== null) data.push({ dist: d, ele: Math.round(ele) });
+        d += stepKm;
+        segPos += stepKm;
     }
-
-    document.getElementById('elevSpinner').style.display = 'inline-block';
-    document.getElementById('elevInfo').textContent = 'Loading...';
-
-    try {
-        const BATCH = 50;
-        const results = [];
-        for (let b = 0; b < points.length; b += BATCH) {
-            if (b > 0) await new Promise(r => setTimeout(r, 150));
-            if (signal.aborted) return;
-            const chunk = points.slice(b, b + BATCH);
-            try {
-                const { elevations, provider } = await fetchElevationBatch(chunk, signal);
-                for (let j = 0; j < elevations.length; j++) {
-                    results.push({ dist: startDist + (b + j) * stepKm, ele: elevations[j] });
-                }
-                _elevProvider = provider;
-            } catch (e) {
-                if (e.name === 'AbortError') return;
-                console.error('Elevation batch fetch error:', e);
-            }
-        }
-        if (results.length > 0) {
-            if (routeElevationData.length > 0) {
-                const lastDist = routeElevationData[routeElevationData.length - 1].dist;
-                const filtered = results.filter(r => r.dist > lastDist + 0.00001);
-                routeElevationData.push(...filtered);
-            } else {
-                routeElevationData.push(...results);
-            }
-            _elevWaiting = false;
-        }
-    } catch (err) {
-        console.error('Elevation fetch error:', err);
-        _elevWaiting = false;
-        _elevFailed = true;
-    } finally {
-        document.getElementById('elevSpinner').style.display = 'none';
-        drawElevProfile();
-        if (_elevFailed && routeElevationData.length < 2) {
-            document.getElementById('elevInfo').textContent = 'API error';
-        } else if (_elevProvider) {
-            document.getElementById('elevInfo').innerHTML += ' <span style=\"color:#556688\">via ' + _elevProvider + '</span>';
-        }
-        _elevFailed = false;
-    }
+    routeElevationData = data.length >= 2 ? data : [];
+    drawElevProfile();
 }
 
 function getElevation(distKm) {
