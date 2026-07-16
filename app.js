@@ -75,6 +75,7 @@ let elevationHistory = [];
 let _lastRecordedMinute = -1;
 let _elevTimer = null;
 let _elevFailed = false;
+let _elevProvider = '';
 
 // ============================================================
 //   Map
@@ -1758,7 +1759,7 @@ async function fetchElevationBatch(chunk, signal) {
         const res = await fetch(url, { signal });
         const data = await res.json();
         if (data && data.status === 'OK' && data.results && data.results.length > 0) {
-            return data.results.map(r => r.elevation);
+            return { elevations: data.results.map(r => r.elevation), provider: 'OpenTopoData' };
         }
     } catch (e) {
         if (e.name === 'AbortError') throw e;
@@ -1772,7 +1773,7 @@ async function fetchElevationBatch(chunk, signal) {
     });
     const data = await res.json();
     if (data && data.results) {
-        return data.results.map(r => r.elevation);
+        return { elevations: data.results.map(r => r.elevation), provider: 'Open-Elevation' };
     }
     throw new Error('All elevation APIs failed');
 }
@@ -1781,6 +1782,7 @@ async function refreshElevations() {
     if (_elevAbort) _elevAbort.abort();
     _elevAbort = new AbortController();
     const signal = _elevAbort.signal;
+    _elevProvider = '';
     if (waypoints.length < 2) {
         routeElevationData = [];
         drawElevProfile();
@@ -1827,10 +1829,11 @@ async function refreshElevations() {
             if (signal.aborted) return;
             const chunk = points.slice(b, b + BATCH);
             try {
-                const elevations = await fetchElevationBatch(chunk, signal);
+                const { elevations, provider } = await fetchElevationBatch(chunk, signal);
                 for (let j = 0; j < elevations.length; j++) {
                     allResults.push({ dist: dists[b + j], ele: elevations[j] });
                 }
+                _elevProvider = provider;
             } catch (e) {
                 if (e.name === 'AbortError') return;
                 console.error('Elevation batch fetch error:', e);
@@ -1841,6 +1844,9 @@ async function refreshElevations() {
             routeElevationData = allResults;
             _elevWaiting = false;
             drawElevProfile();
+            if (_elevProvider) {
+                document.getElementById('elevInfo').innerHTML += ' <span style=\"color:#556688\">via ' + _elevProvider + '</span>';
+            }
         } else {
             routeElevationData = [];
             _elevWaiting = false;
@@ -1872,6 +1878,7 @@ async function appendLastSegmentElevation() {
     if (_elevAbort) _elevAbort.abort();
     _elevAbort = new AbortController();
     const signal = _elevAbort.signal;
+    _elevProvider = '';
 
     const i = waypoints.length - 2;
     let startDist = 0;
@@ -1902,9 +1909,11 @@ async function appendLastSegmentElevation() {
             if (signal.aborted) return;
             const chunk = points.slice(b, b + BATCH);
             try {
-                const elevations = await fetchElevationBatch(chunk, signal);
+                const { elevations, provider } = await fetchElevationBatch(chunk, signal);
                 for (let j = 0; j < elevations.length; j++) {
                     results.push({ dist: startDist + (b + j) * stepKm, ele: elevations[j] });
+                }
+                _elevProvider = provider;
                 }
             } catch (e) {
                 if (e.name === 'AbortError') return;
@@ -1930,6 +1939,8 @@ async function appendLastSegmentElevation() {
         drawElevProfile();
         if (_elevFailed && routeElevationData.length < 2) {
             document.getElementById('elevInfo').textContent = 'API error';
+        } else if (_elevProvider) {
+            document.getElementById('elevInfo').innerHTML += ' <span style=\"color:#556688\">via ' + _elevProvider + '</span>';
         }
         _elevFailed = false;
     }
