@@ -348,7 +348,7 @@ function redrawPath() {
 
     waypoints.forEach((pt, i) => {
         const m = L.circleMarker(pt, {
-            radius: 6,
+            radius: 3,
             color: '#fff',
             weight: 2,
             fillColor: '#4a7cf7',
@@ -565,7 +565,7 @@ function renderScheduledStops() {
     scheduledStopMarkers = [];
     scheduledStops.forEach((s, i) => {
         const m = L.circleMarker(s.latlng, {
-            radius: 8,
+            radius: 4,
             color: '#fff',
             weight: 2,
             fillColor: '#f39c12',
@@ -586,7 +586,7 @@ function renderSpeedPoints() {
     speedPointMarkers = [];
     speedPoints.forEach((s, i) => {
         const m = L.circleMarker(s.latlng, {
-            radius: 8,
+            radius: 4,
             color: '#fff',
             weight: 2,
             fillColor: '#2ecc71',
@@ -607,7 +607,7 @@ function renderCustomPoints() {
     customPointMarkers = [];
     customPoints.forEach(s => {
         const m = L.circleMarker(s.latlng, {
-            radius: 8,
+            radius: 4,
             color: '#fff',
             weight: 2,
             fillColor: '#9b59b6',
@@ -678,7 +678,7 @@ function render112Points() {
     const chkLabels = document.getElementById('chkLabels');
     _112Points.forEach(p => {
         const m = L.circleMarker(p.latlng, {
-            radius: 8,
+            radius: 4,
             color: '#fff',
             weight: 2,
             fillColor: '#e74c3c',
