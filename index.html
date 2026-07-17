@@ -28,19 +28,15 @@
             </h1>
 
             <div style="display:flex;gap:4px;align-items:center;margin-bottom:6px">
-                <select id="speedUnit" style="flex:0 0 70px;background:#0f1a30;border:1px solid #2a3a5e;border-radius:6px;padding:6px 4px;color:#f0f4ff;font-size:12px;outline:none">
-                    <option value="kmh">km/h</option>
-                    <option value="mph">mph</option>
-                </select>
                 <button class="tab-btn active" data-tab="route" style="flex:1">Route</button>
                 <button class="tab-btn" data-tab="nav" style="flex:1">Navigation</button>
             </div>
 
-            <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#8899bb;cursor:pointer;padding:2px 0 4px">
+            <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#8899bb;cursor:pointer;padding:1px 0 4px">
                 <input type="checkbox" id="chkLabels" checked style="accent-color:#4a7cf7;width:14px;height:14px;cursor:pointer" />
                 Show point labels on map
             </label>
-            <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:#8899bb;padding:2px 0 4px">
+            <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:#8899bb;padding:1px 0 4px">
                 <span style="flex-shrink:0">Map:</span>
                 <select id="mapLayer" style="flex:1;background:#0f1a30;border:1px solid #2a3a5e;border-radius:6px;padding:6px 4px;color:#f0f4ff;font-size:12px;outline:none">
                     <option value="osm">OpenStreetMap</option>
@@ -129,13 +125,13 @@
                     </div>
                     <div class="ctrl-group">
                         <label for="speed">Base speed</label>
-                        <input type="number" id="speed" value="1.7" min="0.1" step="0.1" style="width:80px" />
+                        <span style="display:inline-flex;align-items:center;gap:4px"><input type="number" id="speed" value="1.7" min="0.1" step="0.1" style="width:72px" /> <select id="speedUnit" style="background:#0f1a30;border:1px solid #2a3a5e;border-radius:4px;padding:7px 2px;color:#f0f4ff;font-size:12px;outline:none"><option value="kmh">km/h</option><option value="mph">mph</option></select></span>
                     </div>
                 </div>
 
                 <div class="ctrl-group" style="margin:5px 0;gap:8px">
                     <label for="timeScale">Time acceleration: <span id="timeScaleLabel">150</span>×</label>
-                    <input type="range" id="timeScale" min="1" max="150" step="0.1" value="150" />
+                    <input type="range" id="timeScale" min="1" max="300" step="0.1" value="150" />
                 </div>
 
                 <div class="btn-group">
@@ -143,20 +139,24 @@
                     <button class="btn btn-warning" id="btnPause" disabled>Pause</button>
                     <button class="btn btn-danger" id="btnStop" disabled>Stop</button>
                 </div>
-                <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#aabbdd;cursor:pointer;padding:4px 0">
-                    <input type="checkbox" id="chkFollow" checked style="accent-color:#4a7cf7;width:16px;height:16px;cursor:pointer" />
+                <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#aabbdd;cursor:pointer;padding:1px 0">
+                    <input type="checkbox" id="chkFollow" checked style="accent-color:#4a7cf7;width:14px;height:14px;cursor:pointer" />
                     Follow mode
                 </label>
-                <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#aabbdd;cursor:pointer;padding:4px 0">
-                    <input type="checkbox" id="chkUphill" checked style="accent-color:#4a7cf7;width:16px;height:16px;cursor:pointer" />
+                <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#aabbdd;cursor:pointer;padding:1px 0">
+                    <input type="checkbox" id="chkUphill" checked style="accent-color:#4a7cf7;width:14px;height:14px;cursor:pointer" />
                     Uphill auto-slowdown
                     <span class="help-icon" tabindex="0">?
-                        <span class="tooltip-text">When climbing uphill, speed decreases proportionally to slope steepness. At 14° or more — down to 50% of base speed. Elevation data from Open-Elevation API.</span>
+                        <span class="tooltip-text">When climbing uphill, speed decreases proportionally to slope steepness. At 14° or more — down to 50% of base speed.</span>
                     </span>
                 </label>
-                <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#aabbdd;cursor:pointer;padding:4px 0">
-                    <input type="checkbox" id="chk112" checked style="accent-color:#4a7cf7;width:16px;height:16px;cursor:pointer" />
+                <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#aabbdd;cursor:pointer;padding:1px 0">
+                    <input type="checkbox" id="chk112" checked style="accent-color:#4a7cf7;width:14px;height:14px;cursor:pointer" />
                     112 call notifications
+                </label>
+                <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#aabbdd;cursor:pointer;padding:1px 0">
+                    <input type="checkbox" id="chkDrain" style="accent-color:#4a7cf7;width:14px;height:14px;cursor:pointer" />
+                    Battery 15% drain overlay (~ 14:40 – 16:40)
                 </label>
 
                 <div style="border-top:1px solid #2a3a5e;margin:6px 0"></div>

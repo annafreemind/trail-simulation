@@ -131,6 +131,11 @@ body {
     opacity: 0.4;
     cursor: not-allowed;
 }
+input:disabled, select:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    color: #6a7a9a;
+}
 .btn-primary {
     background: #4a7cf7;
 }

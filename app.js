@@ -36,13 +36,13 @@ let movingMarker = null;
 let animationId = null;
 let isPlaying = false;
 let isPaused = false;
+let _currentSpeedKmh = parseFloat(document.getElementById('speed').value) || 1.7;
 let lastFrameTimestamp = 0;
 let totalDistanceKm = 0;
 let traveledDistanceKm = 0;
 let simElapsedSeconds = 0;
 let followMode = true;
 let isAtEnd = false;
-let first112CallShown = false;
 let alarmTriggered = false;
 const ALARM_TIMES = [
     { h: 16, m: 39, label: 'First 112 call' },
@@ -66,6 +66,16 @@ let customPoints = [];
 let customPointMarkers = [];
 let isAddingCustomPoints = false;
 
+let batteryDrainLine = null;
+let _drainStopDots = [];
+let _drainStopActive = false;
+let batteryDrainActive = false;
+let _drainStartDist = 0;
+let _drainEndDist = 0;
+let _drainLastWpIdx = -1;
+let _drainLastUpdateDist = 0;
+let _drainEnded = false;
+
 // ============================================================
 //   Elevation state
 // ============================================================
@@ -84,6 +94,13 @@ const map = L.map('map', {
 map.createPane('route');
 map.getPane('route').style.zIndex = 350;
 const routeRenderer = L.svg({ pane: 'route' });
+map.createPane('drain');
+map.getPane('drain').style.zIndex = 340;
+map.getPane('drain').style.pointerEvents = 'none';
+const drainRenderer = L.svg({ pane: 'drain' });
+let _isZooming = false;
+map.on('zoomstart', () => { _isZooming = true; });
+map.on('zoomend', () => { _isZooming = false; updateBatteryDrain(); });
 
 const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19,
@@ -119,7 +136,7 @@ document.getElementById('mapLayer').addEventListener('change', function() {
         currentLayer = newLayer;
         map.setView(center, Math.min(zoom, newLayer.options.maxZoom));
     }
-    localStorage.setItem('trail_settings', JSON.stringify({ mapLayer: this.value }));
+    saveSettings();
 });
 
 L.marker([8.842428, -82.425013], {
@@ -194,7 +211,7 @@ function formatDistance(km) {
     const isMph = speedUnit() === 'mph';
     const val = isMph ? km * 0.621371 : km;
     const unit = isMph ? ' mi' : ' km';
-    if (km < 0.01) return '0 m';
+    if (km < (isMph ? 0.0048 : 0.01)) return isMph ? '0 ft' : '0 m';
     if (val < 1) return (val * (isMph ? 5280 : 1000)).toFixed(0) + (isMph ? ' ft' : ' m');
     if (val < 10) return val.toFixed(2) + unit;
     if (val < 100) return val.toFixed(1) + unit;
@@ -238,6 +255,7 @@ function formatTime(date) {
 //   Interpolation: get position at distance along path
 // ============================================================
 function getPositionAtDistance(pts, distKm) {
+    if (!pts || pts.length === 0) return null;
     if (distKm <= 0 || pts.length < 2) return pts[0];
     let accumulated = 0;
     for (let i = 1; i < pts.length; i++) {
@@ -308,18 +326,21 @@ function getRouteDistance(latlng) {
     let bestCumulativeKm = 0;
     let cumulativeKm = 0;
     for (let i = 1; i < waypoints.length; i++) {
-        const a = map.latLngToContainerPoint(waypoints[i - 1]);
-        const b = map.latLngToContainerPoint(waypoints[i]);
-        const p = map.latLngToContainerPoint(latlng);
-        const cp = L.LineUtil.closestPointOnSegment(p, a, b);
-        const pt = map.containerPointToLatLng(cp);
+        const A = waypoints[i - 1];
+        const B = waypoints[i];
+        const segKm = haversineKm(A, B);
+        if (segKm <= 0) { cumulativeKm += segKm; continue; }
+        const dLatAB = B.lat - A.lat;
+        const dLngAB = B.lng - A.lng;
+        let t = ((latlng.lat - A.lat) * dLatAB + (latlng.lng - A.lng) * dLngAB) / (dLatAB * dLatAB + dLngAB * dLngAB);
+        t = Math.max(0, Math.min(1, t));
+        const pt = { lat: A.lat + t * dLatAB, lng: A.lng + t * dLngAB };
         const d = haversineKm(pt, latlng);
         if (d < bestDist) {
             bestDist = d;
-            const segKm = haversineKm(waypoints[i - 1], pt);
-            bestCumulativeKm = cumulativeKm + segKm;
+            bestCumulativeKm = cumulativeKm + t * segKm;
         }
-        cumulativeKm += haversineKm(waypoints[i - 1], waypoints[i]);
+        cumulativeKm += segKm;
     }
     return bestCumulativeKm;
 }
@@ -424,9 +445,13 @@ map.on('click', (e) => {
 function updateStartButton() {
     btnStart.disabled = waypoints.length < 2 || !parseFloat(elSpeed.value) || isPlaying;
     btnUndo.disabled = waypoints.length === 0 || isPlaying;
+    btnClear.disabled = isPlaying;
 }
 
-elSpeed.addEventListener('input', updateStartButton);
+elSpeed.addEventListener('input', () => {
+    updateStartButton();
+    if (!isPlaying) saveSettings();
+});
 elSpeedUnit.addEventListener('change', () => {
     const isMph = speedUnit() === 'mph';
     const val = parseFloat(elSpeed.value);
@@ -445,6 +470,7 @@ elSpeedUnit.addEventListener('change', () => {
     updateInfo();
     renderSpeedPoints();
     drawElevProfile();
+    saveSettings();
 });
 
 // ============================================================
@@ -495,15 +521,44 @@ btnUndo.addEventListener('click', () => {
 
 const chkFollow = document.getElementById('chkFollow');
 const chkLabels = document.getElementById('chkLabels');
+const chkUphill = document.getElementById('chkUphill');
+const chk112 = document.getElementById('chk112');
+const chkDrain = document.getElementById('chkDrain');
 chkFollow.addEventListener('change', () => {
     followMode = chkFollow.checked;
     setStatus(followMode ? 'Follow mode on' : 'Follow mode off', '');
+    saveSettings();
 });
 chkLabels.addEventListener('change', () => {
     renderScheduledStops();
     renderSpeedPoints();
     renderCustomPoints();
+    render112Points();
+    saveSettings();
 });
+
+chkUphill.addEventListener('change', saveSettings);
+chk112.addEventListener('change', saveSettings);
+chkDrain.addEventListener('change', () => {
+    updateBatteryDrain();
+    saveSettings();
+});
+
+function saveSettings() {
+    localStorage.setItem('trail_settings', JSON.stringify({
+        mapLayer: document.getElementById('mapLayer').value,
+        speedUnit: speedUnit(),
+        speed: elSpeed.value,
+        speedValue: document.getElementById('speedValue').value,
+        startTime: elStartTime.value,
+        chkLabels: chkLabels.checked,
+        chkFollow: chkFollow.checked,
+        chkUphill: chkUphill.checked,
+        chk112: chk112.checked,
+        chkDrain: chkDrain.checked,
+        timeScale: elTimeScale.value,
+    }));
+}
 
 const routePointList = document.getElementById('routePointList');
 const combinedNavList = document.getElementById('combinedNavList');
@@ -526,20 +581,6 @@ function renderRoutePoints() {
         </div>`;
     }).join('');
 }
-
-routePointList.addEventListener('click', (e) => {
-    const del = e.target.closest('.del-route-point');
-    if (!del) return;
-    const type = del.dataset.type;
-    const idx = parseInt(del.dataset.index);
-    if (type === 'stop') {
-        scheduledStops.splice(idx, 1);
-        renderScheduledStops();
-    } else if (type === 'speed') {
-        speedPoints.splice(idx, 1);
-        renderSpeedPoints();
-    }
-});
 
 function renderNavList() {
     const stops = scheduledStops.map(s => ({ ...s, type: 'stop' }));
@@ -669,13 +710,11 @@ function showAlarm(text) {
 function hideAlarm() {
     const el = document.getElementById('alarm');
     el.style.display = 'none';
-    first112CallShown = false;
 }
 
 function render112Points() {
     _112PointMarkers.forEach(m => map.removeLayer(m));
     _112PointMarkers = [];
-    const chkLabels = document.getElementById('chkLabels');
     _112Points.forEach(p => {
         const m = L.circleMarker(p.latlng, {
             radius: 4,
@@ -697,6 +736,8 @@ function render112Points() {
 // ============================================================
 function stopAnimation() {
     hideAlarm();
+    _alarmTimeouts.forEach(clearTimeout);
+    _alarmTimeouts = [];
     if (animationId) {
         cancelAnimationFrame(animationId);
         animationId = null;
@@ -707,20 +748,34 @@ function stopAnimation() {
     }
     isPlaying = false;
     isPaused = false;
+    elSpeed.disabled = false;
+    elStartTime.disabled = false;
     isAtEnd = false;
     alarmTriggered = false;
     _112Fired = {};
     _112PointMarkers.forEach(m => map.removeLayer(m));
     _112Points = [];
     _112PointMarkers = [];
-    first112CallShown = false;
     traveledDistanceKm = 0;
     simElapsedSeconds = 0;
     _prevSimSec = -1;
     _smoothViewDir = 0;
     _lastRecordedMinute = -1;
     elevationHistory = [];
-    btnStart.disabled = waypoints.length < 2;
+    batteryDrainActive = false;
+    _drainStartDist = 0;
+    _drainEndDist = 0;
+    _drainLastWpIdx = -1;
+    _drainLastUpdateDist = 0;
+    _drainEnded = false;
+    clearDrainLayers();
+
+    scheduledStops.forEach(s => { s.visited = false; delete s.startTime; delete s.endTime; });
+    speedPoints.forEach(sp => sp.activated = false);
+    renderScheduledStops();
+    renderSpeedPoints();
+    renderRoutePoints();
+
     btnStart.textContent = 'Start';
     btnPause.disabled = true;
     btnPause.textContent = 'Pause';
@@ -728,6 +783,7 @@ function stopAnimation() {
     redrawPath();
     resetTimerDisplay();
     updateStartButton();
+    drawElevProfile();
 }
 
 function resetTimerDisplay() {
@@ -737,13 +793,15 @@ function resetTimerDisplay() {
 }
 
 function getSpeedKmh() {
+    if (isPlaying) return _currentSpeedKmh;
     const val = parseFloat(elSpeed.value) || 0;
     return elSpeedUnit.value === 'mph' ? val / 0.621371 : val;
 }
-function speedUnit() { return elSpeedUnit.value; }
+function speedUnit() { return elSpeedUnit ? elSpeedUnit.value : 'kmh'; }
 function formatSpeed(kmh) {
-    const val = speedUnit() === 'mph' ? kmh * 0.621371 : kmh;
-    return val.toFixed(1) + ' ' + speedUnit();
+    const unit = speedUnit();
+    const val = unit === 'mph' ? kmh * 0.621371 : kmh;
+    return val.toFixed(1) + ' ' + unit;
 }
 function formatSpeedVal(kmh) {
     return speedUnit() === 'mph' ? kmh * 0.621371 : kmh;
@@ -756,6 +814,7 @@ function startAnimation() {
         setStatus('Speed must be greater than 0', 'error');
         return;
     }
+    _currentSpeedKmh = speed;
 
     totalDistanceKm = pathLength(waypoints);
 
@@ -764,6 +823,12 @@ function startAnimation() {
             setStatus('Add more waypoints to extend the route', 'error');
             return;
         }
+        scheduledStops.forEach(s => { s.visited = false; delete s.startTime; delete s.endTime; });
+        speedPoints.forEach(sp => sp.activated = false);
+        activeStopIndex = -1;
+        stopRemaining = 0;
+        renderScheduledStops();
+        renderSpeedPoints();
     } else {
         traveledDistanceKm = 0;
         simElapsedSeconds = 0;
@@ -795,8 +860,17 @@ function startAnimation() {
     alarmTriggered = false;
     _prevSimSec = -1;
     _smoothViewDir = 0;
+    batteryDrainActive = false;
+    _drainStartDist = 0;
+    _drainEndDist = 0;
+    _drainLastWpIdx = -1;
+    _drainLastUpdateDist = 0;
+    _drainEnded = false;
+    clearDrainLayers();
     isPlaying = true;
     isPaused = false;
+    elSpeed.disabled = true;
+    elStartTime.disabled = true;
     btnStart.disabled = true;
     btnStart.textContent = 'Start';
     btnPause.disabled = false;
@@ -820,7 +894,6 @@ function animationLoop(timestamp) {
     const multiplier = parseFloat(elTimeScale.value) || 1;
 
     if (isPaused) {
-        animationId = requestAnimationFrame(animationLoop);
         return;
     }
 
@@ -845,13 +918,22 @@ function animationLoop(timestamp) {
     // Scheduled stop wait — timer keeps running, marker stays
     if (activeStopIndex >= 0) {
         stopRemaining -= delta * multiplier;
-        updateTimerDisplay(simElapsedSeconds);
-        updateCurrentTime(simElapsedSeconds);
-        setStatus(`Waiting at "${scheduledStops[activeStopIndex].label}" — ${Math.ceil(stopRemaining)}s`, '');
         if (stopRemaining <= 0) {
+            stopRemaining = 0;
             activeStopIndex = -1;
             setStatus('Movement resumed', 'active');
+            updateTimerDisplay(simElapsedSeconds);
+            updateCurrentTime(simElapsedSeconds);
+            infoCurrentSpeed.textContent = formatSpeed(getSpeedKmh());
+            updateBatteryDrain();
+            animationId = requestAnimationFrame(animationLoop);
+            return;
         }
+        updateTimerDisplay(simElapsedSeconds);
+        updateCurrentTime(simElapsedSeconds);
+        infoCurrentSpeed.textContent = '0 ' + speedUnit();
+        updateBatteryDrain();
+        setStatus(`Waiting at "${scheduledStops[activeStopIndex].label}" — ${Math.ceil(stopRemaining)}s`, '');
         animationId = requestAnimationFrame(animationLoop);
         return;
     }
@@ -859,7 +941,7 @@ function animationLoop(timestamp) {
     const speed = getSpeedKmh();
     let effectiveSpeed = speed;
     _slopeDeg = 0;
-    if (document.getElementById('chkUphill').checked) {
+    if (chkUphill.checked) {
         if (routeElevationData.length >= 2) {
             _slopeDeg = computeSlope(traveledDistanceKm, totalDistanceKm);
             if (_slopeDeg > 0) {
@@ -869,14 +951,17 @@ function animationLoop(timestamp) {
     }
     const speedKmPerSec = effectiveSpeed / 3600;
     traveledDistanceKm += speedKmPerSec * delta * multiplier;
+    traveledDistanceKm = Math.min(traveledDistanceKm, totalDistanceKm);
 
     const pts = waypoints;
     const pos = getPositionAtDistance(pts, traveledDistanceKm);
     movingMarker.setLatLng(pos);
     if (followMode) map.panTo(pos, { animate: false });
 
+    updateBatteryDrain();
+
     // Check 112 alarms
-    if (document.getElementById('chk112').checked) {
+    if (chk112.checked) {
         const st = getStartDateTime();
         if (st && _prevSimSec >= 0) {
             const prev = new Date(st.getTime() + _prevSimSec * 1000);
@@ -935,11 +1020,16 @@ function animationLoop(timestamp) {
         const triggerAt = sp.routeDist;
         if (traveledDistanceKm >= triggerAt) {
             sp.activated = true;
-            elSpeed.value = formatSpeedVal(sp.speed);
+            _currentSpeedKmh = sp.speed;
             setStatus(`Speed changed to ${formatSpeed(sp.speed)} at "${sp.label}"`, '');
             renderSpeedPoints();
             break;
         }
+    }
+
+    if (activeStopIndex >= 0) {
+        animationId = requestAnimationFrame(animationLoop);
+        return;
     }
 
     if (traveledDistanceKm >= totalDistanceKm) {
@@ -951,10 +1041,12 @@ function animationLoop(timestamp) {
         setStatus('Route completed — timer running', 'active');
     }
 
+    if (!isAtEnd) {
     if (_slopeDeg > 0) {
         infoCurrentSpeed.textContent = formatSpeed(effectiveSpeed) + '  \u2191' + _slopeDeg.toFixed(0) + '\u00b0';
     } else {
         infoCurrentSpeed.textContent = formatSpeed(getSpeedKmh());
+    }
     }
     updateTimerDisplay(simElapsedSeconds);
     updateCurrentTime(simElapsedSeconds);
@@ -970,6 +1062,133 @@ function animationLoop(timestamp) {
 
 function updateTimerDisplay(sec) {
     infoTimer.textContent = formatDuration(sec);
+}
+
+function updateBatteryDrain() {
+    if (!isPlaying || !movingMarker) return;
+
+    if (!chkDrain || !chkDrain.checked) {
+        clearDrainLayers();
+        batteryDrainActive = false;
+        _drainEnded = false;
+        return;
+    }
+
+    if (_drainEnded) return;
+
+    const st = getStartDateTime();
+    if (!st) return;
+    const simTime = new Date(st.getTime() + simElapsedSeconds * 1000);
+    const simTotalMins = simTime.getHours() * 60 + simTime.getMinutes();
+
+    const DRAIN_START = 14 * 60 + 40;
+    const DRAIN_END = 16 * 60 + 40;
+
+    if (simTotalMins < DRAIN_START) return;
+
+    if (simTotalMins > DRAIN_END) {
+        if (!_drainEnded) {
+            if (!batteryDrainActive) {
+                batteryDrainActive = true;
+                const startMins = st.getHours() * 60 + st.getMinutes();
+                const elapsed = simTotalMins - startMins;
+                if (elapsed > 0 && simTotalMins > DRAIN_START) {
+                    _drainStartDist = traveledDistanceKm * Math.max(0, Math.min(1, (DRAIN_START - startMins) / elapsed));
+                    if (_drainEndDist <= 0) {
+                        _drainEndDist = traveledDistanceKm * Math.min(1, (DRAIN_END - startMins) / elapsed);
+                    }
+                } else {
+                    _drainStartDist = traveledDistanceKm;
+                    _drainEndDist = traveledDistanceKm;
+                }
+                _drainLastUpdateDist = traveledDistanceKm;
+            } else {
+                _drainEndDist = traveledDistanceKm;
+            }
+            _drainEnded = true;
+            refreshDrainPath();
+        }
+        return;
+    }
+
+    if (!batteryDrainActive) {
+        batteryDrainActive = true;
+        _drainStopActive = false;
+
+        const startMins = st.getHours() * 60 + st.getMinutes();
+        const elapsed = simTotalMins - startMins;
+        if (elapsed > 0 && simTotalMins > DRAIN_START) {
+            const frac = Math.max(0, Math.min(1, (DRAIN_START - startMins) / elapsed));
+            _drainStartDist = traveledDistanceKm * frac;
+        } else {
+            _drainStartDist = traveledDistanceKm;
+        }
+        _drainLastUpdateDist = traveledDistanceKm;
+        refreshDrainPath();
+    }
+
+    if (activeStopIndex >= 0) {
+        if (!_drainStopActive) {
+            _drainStopActive = true;
+            const pos = movingMarker.getLatLng();
+            const dot = L.circle(pos, {
+                radius: 10, color: 'transparent', weight: 0,
+                fillColor: '#e91e63', fillOpacity: 0.35,
+                interactive: false, renderer: drainRenderer,
+            }).addTo(map);
+            _drainStopDots.push(dot);
+        }
+        return;
+    }
+
+    _drainStopActive = false;
+
+    if (traveledDistanceKm - _drainLastUpdateDist < 0.005) return;
+
+    _drainLastUpdateDist = traveledDistanceKm;
+    refreshDrainPath();
+}
+
+function refreshDrainPath() {
+    if (_isZooming || !batteryDrainActive) return;
+
+    _drainLastUpdateDist = traveledDistanceKm;
+    const endDist = _drainEnded ? _drainEndDist : traveledDistanceKm;
+    const pts = [];
+    pts.push(getPositionAtDistance(waypoints, _drainStartDist));
+
+    let dist = 0;
+    for (let i = 0; i < waypoints.length - 1; i++) {
+        const segDist = haversineKm(waypoints[i], waypoints[i + 1]);
+        const segEnd = dist + segDist;
+        if (dist >= _drainStartDist && dist < endDist) pts.push(waypoints[i]);
+        if (segEnd > _drainStartDist && segEnd <= endDist) pts.push(waypoints[i + 1]);
+        dist = segEnd;
+        if (dist >= endDist) break;
+    }
+
+    const lastPos = getPositionAtDistance(waypoints, Math.min(endDist, totalDistanceKm));
+    const lastPt = pts[pts.length - 1];
+    if (!lastPt || Math.abs(lastPt.lat - lastPos.lat) > 0.00001 || Math.abs(lastPt.lng - lastPos.lng) > 0.00001) {
+        pts.push(lastPos);
+    }
+
+    if (pts.length < 2) return;
+
+    if (batteryDrainLine) {
+        batteryDrainLine.setLatLngs(pts);
+    } else {
+        batteryDrainLine = L.polyline(pts, {
+            color: '#e91e63', weight: 10, opacity: 0.35,
+            interactive: false, renderer: drainRenderer,
+        }).addTo(map);
+    }
+}
+
+function clearDrainLayers() {
+    if (batteryDrainLine) { map.removeLayer(batteryDrainLine); batteryDrainLine = null; }
+    _drainStopDots.forEach(d => map.removeLayer(d));
+    _drainStopDots = [];
 }
 
 function getStartDateTime() {
@@ -1007,19 +1226,20 @@ btnPause.addEventListener('click', () => {
         isPaused = true;
         btnPause.textContent = 'Resume';
         setStatus('Paused', '');
-        infoCurrentSpeed.textContent = '0 ' + speedUnit();
     } else {
         isPaused = false;
         btnPause.textContent = 'Pause';
         lastFrameTimestamp = performance.now();
+        const val = parseFloat(elSpeed.value) || 0;
+        _currentSpeedKmh = elSpeedUnit.value === 'mph' ? val / 0.621371 : val;
         infoCurrentSpeed.textContent = formatSpeed(getSpeedKmh());
         setStatus('Movement resumed', 'active');
+        animationId = requestAnimationFrame(animationLoop);
     }
 });
 
 btnStop.addEventListener('click', () => {
     stopAnimation();
-    elSpeed.value = speedUnit() === 'mph' ? 1.0 : 1.7;
     setStatus('Movement stopped', '');
     updateStartButton();
 });
@@ -1030,6 +1250,7 @@ btnStop.addEventListener('click', () => {
 elTimeScaleLabel.textContent = elTimeScale.value;
 elTimeScale.addEventListener('input', () => {
     elTimeScaleLabel.textContent = elTimeScale.value;
+    saveSettings();
 });
 
 // ============================================================
@@ -1068,10 +1289,6 @@ document.querySelectorAll('.mode-btn').forEach(btn => {
 
 setStatus('Click the map to start building a route');
 updateStartButton();
-
-elSpeed.addEventListener('input', () => {
-    if (!isPlaying) updateStartButton();
-});
 
 // Sidebar resize handle
 (function () {
@@ -1281,14 +1498,46 @@ document.getElementById('btnSave').addEventListener('click', async () => {
 
 migrateToDB().then(() => populateRouteList());
 
-if (elSpeedUnit.value === 'mph') {
-    elSpeed.value = '1.0';
-    document.getElementById('speedValue').value = '1.0';
-}
-
-// Restore map layer preference
+// Restore settings from localStorage — mapLayer must be LAST
+// because its dispatched change event saves all settings to localStorage.
 try {
     const saved = JSON.parse(localStorage.getItem('trail_settings'));
+    if (saved && saved.speedUnit) {
+        document.getElementById('speedUnit').value = saved.speedUnit;
+    }
+    if (saved && saved.speed) {
+        elSpeed.value = saved.speed;
+    }
+    if (saved && saved.speedValue) {
+        document.getElementById('speedValue').value = saved.speedValue;
+    }
+    if (saved && saved.startTime) {
+        elStartTime.value = saved.startTime;
+    }
+    if (saved && saved.chkFollow !== undefined) {
+        document.getElementById('chkFollow').checked = saved.chkFollow;
+        followMode = saved.chkFollow;
+    }
+    if (saved && saved.chkUphill !== undefined) {
+        document.getElementById('chkUphill').checked = saved.chkUphill;
+    }
+    if (saved && saved.chk112 !== undefined) {
+        document.getElementById('chk112').checked = saved.chk112;
+    }
+    if (saved && saved.chkDrain !== undefined) {
+        document.getElementById('chkDrain').checked = saved.chkDrain;
+    }
+    if (saved && saved.timeScale) {
+        elTimeScale.value = saved.timeScale;
+        elTimeScaleLabel.textContent = saved.timeScale;
+    }
+    if (saved && saved.chkLabels !== undefined) {
+        document.getElementById('chkLabels').checked = saved.chkLabels;
+        renderScheduledStops();
+        renderSpeedPoints();
+        renderCustomPoints();
+        render112Points();
+    }
     if (saved && saved.mapLayer) {
         document.getElementById('mapLayer').value = saved.mapLayer;
         document.getElementById('mapLayer').dispatchEvent(new Event('change'));
@@ -1732,7 +1981,10 @@ function refreshSunView() {
     if (st) updateSunView(new Date(st.getTime() + simElapsedSeconds * 1000), true);
 }
 
-elStartTime.addEventListener('input', refreshSunView);
+elStartTime.addEventListener('input', () => {
+    refreshSunView();
+    saveSettings();
+});
 refreshSunView();
 
 // Toggle sun widget
@@ -1984,6 +2236,13 @@ document.getElementById('btnExport').addEventListener('click', async () => {
             mapLayer: document.getElementById('mapLayer').value,
             chkLabels: document.getElementById('chkLabels').checked,
             chkFollow: document.getElementById('chkFollow').checked,
+            chkUphill: document.getElementById('chkUphill').checked,
+            chk112: document.getElementById('chk112').checked,
+            chkDrain: document.getElementById('chkDrain').checked,
+            timeScale: elTimeScale.value,
+            startTime: elStartTime.value,
+            speed: elSpeed.value,
+            speedValue: document.getElementById('speedValue').value,
         }
     };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -2040,6 +2299,28 @@ document.getElementById('importFile').addEventListener('change', async function 
                 if (s.chkFollow !== undefined) {
                     document.getElementById('chkFollow').checked = s.chkFollow;
                     followMode = s.chkFollow;
+                }
+                if (s.chkUphill !== undefined) {
+                    document.getElementById('chkUphill').checked = s.chkUphill;
+                }
+                if (s.chk112 !== undefined) {
+                    document.getElementById('chk112').checked = s.chk112;
+                }
+                if (s.chkDrain !== undefined) {
+                    document.getElementById('chkDrain').checked = s.chkDrain;
+                }
+                if (s.timeScale !== undefined) {
+                    elTimeScale.value = s.timeScale;
+                    elTimeScaleLabel.textContent = s.timeScale;
+                }
+                if (s.startTime) {
+                    elStartTime.value = s.startTime;
+                }
+                if (s.speed) {
+                    elSpeed.value = s.speed;
+                }
+                if (s.speedValue) {
+                    document.getElementById('speedValue').value = s.speedValue;
                 }
             }
             await populateRouteList();
