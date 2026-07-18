@@ -139,15 +139,31 @@ document.getElementById('mapLayer').addEventListener('change', function() {
     saveSettings();
 });
 
-L.marker([8.842428, -82.425013], {
-    icon: L.divIcon({
-        className: 'marker-508',
-        html: '<div class="marker-508-shape"><span>508</span></div>',
-        iconSize: [44, 46],
-        iconAnchor: [22, 43],
-    }),
-    zIndexOffset: 500,
-}).addTo(map);
+const poiIcons = L.layerGroup().addTo(map);
+const poiLabels = L.layerGroup().addTo(map);
+
+PHOTOS.forEach(p => {
+    L.marker([p.lat, p.lng], {
+        icon: L.divIcon({
+            className: 'photo-icon-only',
+            html: `📷`,
+            iconSize: [18, 18],
+            iconAnchor: [9, 9],
+        }),
+        zIndexOffset: 700,
+    }).addTo(poiIcons);
+
+    L.marker([p.lat, p.lng], {
+        icon: L.divIcon({
+            className: 'photo-label-only',
+            html: `<span class="photo-text"><span class="photo-line">${p.photo}</span> · <span class="photo-time">${p.time}</span><br><span class="photo-desc">${p.desc}</span></span>`,
+            iconSize: [0, 0],
+            iconAnchor: [-12, 14],
+        }),
+        zIndexOffset: 700,
+        interactive: false,
+    }).addTo(poiLabels);
+});
 
 // elevation grid coverage — 30×30 km around Boquete
 L.rectangle([[8.705, -82.555], [8.975, -82.285]], {
@@ -168,23 +184,23 @@ L.marker([8.975, -82.42], {
     interactive: false,
 }).addTo(map);
 
-L.circleMarker([8.878563, -82.408597], {
+const poiShorts = L.circleMarker([8.878563, -82.408597], {
     radius: 14,
     color: '#e74c3c',
     weight: 2,
     fillColor: 'transparent',
     fillOpacity: 0,
     zIndexOffset: 500,
-}).addTo(map).bindTooltip('Kris shorts', { permanent: true, direction: 'top', offset: [0, -4] });
+}).addTo(poiIcons).bindTooltip('Kris shorts', { permanent: true, direction: 'top', offset: [0, -4] });
 
-L.circleMarker([8.91823, -82.41274], {
+const poiBackpack = L.circleMarker([8.91823, -82.41274], {
     radius: 14,
     color: '#e74c3c',
     weight: 2,
     fillColor: 'transparent',
     fillOpacity: 0,
     zIndexOffset: 500,
-}).addTo(map).bindTooltip('Backpack', { permanent: true, direction: 'top', offset: [0, -4] });
+}).addTo(poiIcons).bindTooltip('Backpack', { permanent: true, direction: 'top', offset: [0, -4] });
 
 // ============================================================
 //   Helpers
@@ -521,6 +537,8 @@ btnUndo.addEventListener('click', () => {
 
 const chkFollow = document.getElementById('chkFollow');
 const chkLabels = document.getElementById('chkLabels');
+const chkPoi = document.getElementById('chkPoi');
+const chkPoiLabels = document.getElementById('chkPoiLabels');
 const chkUphill = document.getElementById('chkUphill');
 const chk112 = document.getElementById('chk112');
 const chkDrain = document.getElementById('chkDrain');
@@ -536,6 +554,39 @@ chkLabels.addEventListener('change', () => {
     render112Points();
     saveSettings();
 });
+chkPoi.addEventListener('change', () => {
+    chkPoiLabels.disabled = !chkPoi.checked;
+    if (chkPoi.checked) {
+        poiIcons.addTo(map);
+        if (chkPoiLabels.checked) {
+            poiLabels.addTo(map);
+            bindPoiTooltips();
+        }
+    } else {
+        map.removeLayer(poiIcons);
+        map.removeLayer(poiLabels);
+        unbindPoiTooltips();
+    }
+    saveSettings();
+});
+chkPoiLabels.addEventListener('change', () => {
+    if (chkPoiLabels.checked) {
+        poiLabels.addTo(map);
+        bindPoiTooltips();
+    } else {
+        map.removeLayer(poiLabels);
+        unbindPoiTooltips();
+    }
+    saveSettings();
+});
+function bindPoiTooltips() {
+    poiShorts.bindTooltip('Kris shorts', { permanent: true, direction: 'top', offset: [0, -4] });
+    poiBackpack.bindTooltip('Backpack', { permanent: true, direction: 'top', offset: [0, -4] });
+}
+function unbindPoiTooltips() {
+    poiShorts.unbindTooltip();
+    poiBackpack.unbindTooltip();
+}
 
 chkUphill.addEventListener('change', saveSettings);
 chk112.addEventListener('change', saveSettings);
@@ -552,6 +603,8 @@ function saveSettings() {
         speedValue: document.getElementById('speedValue').value,
         startTime: elStartTime.value,
         chkLabels: chkLabels.checked,
+        chkPoi: chkPoi.checked,
+        chkPoiLabels: chkPoiLabels.checked,
         chkFollow: chkFollow.checked,
         chkUphill: chkUphill.checked,
         chk112: chk112.checked,
@@ -1538,6 +1591,22 @@ try {
         renderCustomPoints();
         render112Points();
     }
+    if (saved && saved.chkPoi !== undefined) {
+        document.getElementById('chkPoi').checked = saved.chkPoi;
+        if (!saved.chkPoi) {
+            map.removeLayer(poiIcons);
+            map.removeLayer(poiLabels);
+            unbindPoiTooltips();
+        }
+    }
+    if (saved && saved.chkPoiLabels !== undefined) {
+        chkPoiLabels.checked = saved.chkPoiLabels;
+        chkPoiLabels.disabled = !chkPoi.checked;
+        if (!saved.chkPoiLabels || !saved.chkPoi) {
+            map.removeLayer(poiLabels);
+            unbindPoiTooltips();
+        }
+    }
     if (saved && saved.mapLayer) {
         document.getElementById('mapLayer').value = saved.mapLayer;
         document.getElementById('mapLayer').dispatchEvent(new Event('change'));
@@ -2235,6 +2304,8 @@ document.getElementById('btnExport').addEventListener('click', async () => {
             speedUnit: document.getElementById('speedUnit').value,
             mapLayer: document.getElementById('mapLayer').value,
             chkLabels: document.getElementById('chkLabels').checked,
+            chkPoi: document.getElementById('chkPoi').checked,
+            chkPoiLabels: document.getElementById('chkPoiLabels').checked,
             chkFollow: document.getElementById('chkFollow').checked,
             chkUphill: document.getElementById('chkUphill').checked,
             chk112: document.getElementById('chk112').checked,
@@ -2295,6 +2366,22 @@ document.getElementById('importFile').addEventListener('change', async function 
                     renderScheduledStops();
                     renderSpeedPoints();
                     renderCustomPoints();
+                }
+                if (s.chkPoi !== undefined) {
+                    document.getElementById('chkPoi').checked = s.chkPoi;
+                    if (!s.chkPoi) {
+                        map.removeLayer(poiIcons);
+                        map.removeLayer(poiLabels);
+                        unbindPoiTooltips();
+                    }
+                }
+                if (s.chkPoiLabels !== undefined) {
+                    chkPoiLabels.checked = s.chkPoiLabels;
+                    chkPoiLabels.disabled = !chkPoi.checked;
+                    if (!s.chkPoiLabels || !chkPoi.checked) {
+                        map.removeLayer(poiLabels);
+                        unbindPoiTooltips();
+                    }
                 }
                 if (s.chkFollow !== undefined) {
                     document.getElementById('chkFollow').checked = s.chkFollow;
