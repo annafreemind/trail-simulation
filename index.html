@@ -37,15 +37,17 @@
                 <input type="checkbox" id="chkLabels" checked style="accent-color:#4a7cf7;width:14px;height:14px;cursor:pointer" />
                 Show point labels on map
             </label>
-            <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#8899bb;cursor:pointer;padding:1px 0">
-                <input type="checkbox" id="chkPoi" checked style="accent-color:#4a7cf7;width:14px;height:14px;cursor:pointer" />
-                POI
-                <label class="poi-labels-toggle">
+            <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:#8899bb;padding:1px 0">
+                <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+                    <input type="checkbox" id="chkPoi" checked style="accent-color:#4a7cf7;width:14px;height:14px;cursor:pointer" />
+                    POI
+                </label>
+                <label class="poi-labels-toggle" style="display:flex;align-items:center;gap:4px;cursor:pointer">
                     <input type="checkbox" id="chkPoiLabels" checked />
                     <span class="toggle-slider"></span>
+                    <span style="color:#8899bb;font-size:10px">POI labels</span>
                 </label>
-                <span style="color:#667;font-size:10px">POI labels</span>
-            </label>
+            </div>
             <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:#8899bb;padding:1px 0 4px">
                 <span style="flex-shrink:0">Map:</span>
                 <select id="mapLayer" style="flex:1;background:#0f1a30;border:1px solid #2a3a5e;border-radius:6px;padding:6px 4px;color:#f0f4ff;font-size:12px;outline:none">
@@ -167,8 +169,18 @@
                 </label>
                 <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#aabbdd;cursor:pointer;padding:1px 0">
                     <input type="checkbox" id="chkDrain" style="accent-color:#4a7cf7;width:14px;height:14px;cursor:pointer" />
-                    Battery 15% drain overlay (~ 14:40 – 16:40)
+                    Battery drain overlay
                 </label>
+                <div id="drainModes" style="margin-top:-4px;padding:0 0 0 20px;font-size:11px;color:#aabbdd">
+                    <label style="display:flex;align-items:center;gap:4px;cursor:pointer;padding:1px 0">
+                        <input type="radio" name="drainMode" value="full" checked style="accent-color:#4a7cf7;width:12px;height:12px;cursor:pointer" />
+                        ~ 14:40 – 16:40
+                    </label>
+                    <label style="display:flex;align-items:center;gap:4px;cursor:pointer;padding:1px 0">
+                        <input type="radio" name="drainMode" value="short" style="accent-color:#4a7cf7;width:12px;height:12px;cursor:pointer" />
+                        ~ 15:20 – 15:30
+                    </label>
+                </div>
 
                 <div style="border-top:1px solid #2a3a5e;margin:6px 0"></div>
                 <div class="info-row">
@@ -228,6 +240,7 @@
     <script src="weather_data.js"></script>
     <script src="elevation_grid.js"></script>
     <script src="photos.js"></script>
+    <script src="pois.js"></script>
     <script src="app.js"></script>
 </body>
 </html>

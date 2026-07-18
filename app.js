@@ -71,6 +71,7 @@ let _drainStopDots = [];
 let _drainStopActive = false;
 let batteryDrainActive = false;
 let _drainStartDist = 0;
+let _drainStartSet = false;
 let _drainEndDist = 0;
 let _drainLastWpIdx = -1;
 let _drainLastUpdateDist = 0;
@@ -184,23 +185,27 @@ L.marker([8.975, -82.42], {
     interactive: false,
 }).addTo(map);
 
-const poiShorts = L.circleMarker([8.878563, -82.408597], {
-    radius: 14,
-    color: '#e74c3c',
-    weight: 2,
-    fillColor: 'transparent',
-    fillOpacity: 0,
-    zIndexOffset: 500,
-}).addTo(poiIcons).bindTooltip('Kris shorts', { permanent: true, direction: 'top', offset: [0, -4] });
+POIS.forEach(p => {
+    L.circleMarker([p.lat, p.lng], {
+        radius: 14,
+        color: '#e74c3c',
+        weight: 2,
+        fillColor: 'transparent',
+        fillOpacity: 0,
+        zIndexOffset: 500,
+    }).addTo(poiIcons);
 
-const poiBackpack = L.circleMarker([8.91823, -82.41274], {
-    radius: 14,
-    color: '#e74c3c',
-    weight: 2,
-    fillColor: 'transparent',
-    fillOpacity: 0,
-    zIndexOffset: 500,
-}).addTo(poiIcons).bindTooltip('Backpack', { permanent: true, direction: 'top', offset: [0, -4] });
+    L.marker([p.lat, p.lng], {
+        icon: L.divIcon({
+            className: 'photo-label-only',
+            html: `<span class="photo-text"><span class="photo-line" style="font-weight:400">${p.name}</span></span>`,
+            iconSize: [0, 0],
+            iconAnchor: [-16, 8],
+        }),
+        zIndexOffset: 700,
+        interactive: false,
+    }).addTo(poiLabels);
+});
 
 // ============================================================
 //   Helpers
@@ -560,40 +565,53 @@ chkPoi.addEventListener('change', () => {
         poiIcons.addTo(map);
         if (chkPoiLabels.checked) {
             poiLabels.addTo(map);
-            bindPoiTooltips();
         }
     } else {
         map.removeLayer(poiIcons);
         map.removeLayer(poiLabels);
-        unbindPoiTooltips();
     }
     saveSettings();
 });
 chkPoiLabels.addEventListener('change', () => {
     if (chkPoiLabels.checked) {
         poiLabels.addTo(map);
-        bindPoiTooltips();
     } else {
         map.removeLayer(poiLabels);
-        unbindPoiTooltips();
     }
     saveSettings();
 });
-function bindPoiTooltips() {
-    poiShorts.bindTooltip('Kris shorts', { permanent: true, direction: 'top', offset: [0, -4] });
-    poiBackpack.bindTooltip('Backpack', { permanent: true, direction: 'top', offset: [0, -4] });
-}
-function unbindPoiTooltips() {
-    poiShorts.unbindTooltip();
-    poiBackpack.unbindTooltip();
-}
 
 chkUphill.addEventListener('change', saveSettings);
 chk112.addEventListener('change', saveSettings);
 chkDrain.addEventListener('change', () => {
+    setDrainModesDisabled(!chkDrain.checked || isPlaying);
     updateBatteryDrain();
     saveSettings();
 });
+document.querySelectorAll('input[name="drainMode"]').forEach(r => {
+    r.addEventListener('change', () => {
+        clearDrainState();
+        updateBatteryDrain();
+        saveSettings();
+    });
+});
+function drainMode() {
+    const el = document.querySelector('input[name="drainMode"]:checked');
+    return el ? el.value : 'full';
+}
+function drainTimes() {
+    if (drainMode() === 'short') return { start: 15 * 60 + 20, end: 15 * 60 + 30 };
+    return { start: 14 * 60 + 40, end: 16 * 60 + 40 };
+}
+function clearDrainState() {
+    clearDrainLayers();
+    batteryDrainActive = false;
+    _drainEnded = false;
+}
+function setDrainModesDisabled(state) {
+    document.getElementById('drainModes').classList.toggle('disabled', state);
+    document.querySelectorAll('input[name="drainMode"]').forEach(r => r.disabled = state);
+}
 
 function saveSettings() {
     localStorage.setItem('trail_settings', JSON.stringify({
@@ -609,6 +627,7 @@ function saveSettings() {
         chkUphill: chkUphill.checked,
         chk112: chk112.checked,
         chkDrain: chkDrain.checked,
+        drainMode: drainMode(),
         timeScale: elTimeScale.value,
     }));
 }
@@ -803,6 +822,7 @@ function stopAnimation() {
     isPaused = false;
     elSpeed.disabled = false;
     elStartTime.disabled = false;
+    setDrainModesDisabled(!chkDrain.checked);
     isAtEnd = false;
     alarmTriggered = false;
     _112Fired = {};
@@ -817,6 +837,7 @@ function stopAnimation() {
     elevationHistory = [];
     batteryDrainActive = false;
     _drainStartDist = 0;
+    _drainStartSet = false;
     _drainEndDist = 0;
     _drainLastWpIdx = -1;
     _drainLastUpdateDist = 0;
@@ -835,6 +856,7 @@ function stopAnimation() {
     btnStop.disabled = true;
     redrawPath();
     resetTimerDisplay();
+    updateSunView(getStartDateTime());
     updateStartButton();
     drawElevProfile();
 }
@@ -915,6 +937,7 @@ function startAnimation() {
     _smoothViewDir = 0;
     batteryDrainActive = false;
     _drainStartDist = 0;
+    _drainStartSet = false;
     _drainEndDist = 0;
     _drainLastWpIdx = -1;
     _drainLastUpdateDist = 0;
@@ -924,6 +947,7 @@ function startAnimation() {
     isPaused = false;
     elSpeed.disabled = true;
     elStartTime.disabled = true;
+    setDrainModesDisabled(true);
     btnStart.disabled = true;
     btnStart.textContent = 'Start';
     btnPause.disabled = false;
@@ -1121,9 +1145,7 @@ function updateBatteryDrain() {
     if (!isPlaying || !movingMarker) return;
 
     if (!chkDrain || !chkDrain.checked) {
-        clearDrainLayers();
-        batteryDrainActive = false;
-        _drainEnded = false;
+        clearDrainState();
         return;
     }
 
@@ -1134,8 +1156,9 @@ function updateBatteryDrain() {
     const simTime = new Date(st.getTime() + simElapsedSeconds * 1000);
     const simTotalMins = simTime.getHours() * 60 + simTime.getMinutes();
 
-    const DRAIN_START = 14 * 60 + 40;
-    const DRAIN_END = 16 * 60 + 40;
+    const dt = drainTimes();
+    const DRAIN_START = dt.start;
+    const DRAIN_END = dt.end;
 
     if (simTotalMins < DRAIN_START) return;
 
@@ -1143,20 +1166,24 @@ function updateBatteryDrain() {
         if (!_drainEnded) {
             if (!batteryDrainActive) {
                 batteryDrainActive = true;
-                const startMins = st.getHours() * 60 + st.getMinutes();
-                const elapsed = simTotalMins - startMins;
-                if (elapsed > 0 && simTotalMins > DRAIN_START) {
-                    _drainStartDist = traveledDistanceKm * Math.max(0, Math.min(1, (DRAIN_START - startMins) / elapsed));
-                    if (_drainEndDist <= 0) {
-                        _drainEndDist = traveledDistanceKm * Math.min(1, (DRAIN_END - startMins) / elapsed);
+                if (!_drainStartSet) {
+                    _drainStartSet = true;
+                    const startMins = st.getHours() * 60 + st.getMinutes();
+                    const elapsed = simTotalMins - startMins;
+                    if (elapsed > 0 && simTotalMins > DRAIN_START) {
+                        _drainStartDist = traveledDistanceKm * Math.max(0, Math.min(1, (DRAIN_START - startMins) / elapsed));
+                    } else {
+                        _drainStartDist = traveledDistanceKm;
                     }
-                } else {
-                    _drainStartDist = traveledDistanceKm;
-                    _drainEndDist = traveledDistanceKm;
                 }
                 _drainLastUpdateDist = traveledDistanceKm;
-            } else {
-                _drainEndDist = traveledDistanceKm;
+            }
+            if (_drainEndDist <= 0) {
+                const startMins = st.getHours() * 60 + st.getMinutes();
+                const elapsed = simTotalMins - startMins;
+                _drainEndDist = elapsed > 0
+                    ? traveledDistanceKm * Math.min(1, (DRAIN_END - startMins) / elapsed)
+                    : traveledDistanceKm;
             }
             _drainEnded = true;
             refreshDrainPath();
@@ -1168,13 +1195,16 @@ function updateBatteryDrain() {
         batteryDrainActive = true;
         _drainStopActive = false;
 
-        const startMins = st.getHours() * 60 + st.getMinutes();
-        const elapsed = simTotalMins - startMins;
-        if (elapsed > 0 && simTotalMins > DRAIN_START) {
-            const frac = Math.max(0, Math.min(1, (DRAIN_START - startMins) / elapsed));
-            _drainStartDist = traveledDistanceKm * frac;
-        } else {
-            _drainStartDist = traveledDistanceKm;
+        if (!_drainStartSet) {
+            _drainStartSet = true;
+            const startMins = st.getHours() * 60 + st.getMinutes();
+            const elapsed = simTotalMins - startMins;
+            if (elapsed > 0 && simTotalMins > DRAIN_START) {
+                const frac = Math.max(0, Math.min(1, (DRAIN_START - startMins) / elapsed));
+                _drainStartDist = traveledDistanceKm * frac;
+            } else {
+                _drainStartDist = traveledDistanceKm;
+            }
         }
         _drainLastUpdateDist = traveledDistanceKm;
         refreshDrainPath();
@@ -1279,9 +1309,11 @@ btnPause.addEventListener('click', () => {
         isPaused = true;
         btnPause.textContent = 'Resume';
         setStatus('Paused', '');
+        setDrainModesDisabled(true);
     } else {
         isPaused = false;
         btnPause.textContent = 'Pause';
+        setDrainModesDisabled(true);
         lastFrameTimestamp = performance.now();
         const val = parseFloat(elSpeed.value) || 0;
         _currentSpeedKmh = elSpeedUnit.value === 'mph' ? val / 0.621371 : val;
@@ -1579,6 +1611,11 @@ try {
     }
     if (saved && saved.chkDrain !== undefined) {
         document.getElementById('chkDrain').checked = saved.chkDrain;
+        setDrainModesDisabled(!saved.chkDrain);
+    }
+    if (saved && saved.drainMode) {
+        const r = document.querySelector(`input[name="drainMode"][value="${saved.drainMode}"]`);
+        if (r) r.checked = true;
     }
     if (saved && saved.timeScale) {
         elTimeScale.value = saved.timeScale;
@@ -1596,7 +1633,6 @@ try {
         if (!saved.chkPoi) {
             map.removeLayer(poiIcons);
             map.removeLayer(poiLabels);
-            unbindPoiTooltips();
         }
     }
     if (saved && saved.chkPoiLabels !== undefined) {
@@ -1604,7 +1640,6 @@ try {
         chkPoiLabels.disabled = !chkPoi.checked;
         if (!saved.chkPoiLabels || !saved.chkPoi) {
             map.removeLayer(poiLabels);
-            unbindPoiTooltips();
         }
     }
     if (saved && saved.mapLayer) {
@@ -2310,6 +2345,7 @@ document.getElementById('btnExport').addEventListener('click', async () => {
             chkUphill: document.getElementById('chkUphill').checked,
             chk112: document.getElementById('chk112').checked,
             chkDrain: document.getElementById('chkDrain').checked,
+            drainMode: drainMode(),
             timeScale: elTimeScale.value,
             startTime: elStartTime.value,
             speed: elSpeed.value,
@@ -2372,7 +2408,6 @@ document.getElementById('importFile').addEventListener('change', async function 
                     if (!s.chkPoi) {
                         map.removeLayer(poiIcons);
                         map.removeLayer(poiLabels);
-                        unbindPoiTooltips();
                     }
                 }
                 if (s.chkPoiLabels !== undefined) {
@@ -2380,7 +2415,6 @@ document.getElementById('importFile').addEventListener('change', async function 
                     chkPoiLabels.disabled = !chkPoi.checked;
                     if (!s.chkPoiLabels || !chkPoi.checked) {
                         map.removeLayer(poiLabels);
-                        unbindPoiTooltips();
                     }
                 }
                 if (s.chkFollow !== undefined) {
@@ -2395,6 +2429,11 @@ document.getElementById('importFile').addEventListener('change', async function 
                 }
                 if (s.chkDrain !== undefined) {
                     document.getElementById('chkDrain').checked = s.chkDrain;
+                    setDrainModesDisabled(!s.chkDrain);
+                }
+                if (s.drainMode) {
+                    const r = document.querySelector(`input[name="drainMode"][value="${s.drainMode}"]`);
+                    if (r) r.checked = true;
                 }
                 if (s.timeScale !== undefined) {
                     elTimeScale.value = s.timeScale;
