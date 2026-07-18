@@ -584,35 +584,95 @@ chkPoiLabels.addEventListener('change', () => {
 chkUphill.addEventListener('change', saveSettings);
 chk112.addEventListener('change', saveSettings);
 chkDrain.addEventListener('change', () => {
-    setDrainModesDisabled(!chkDrain.checked || isPlaying);
+    setDrainVisibility(chkDrain.checked && !isPlaying);
     updateBatteryDrain();
     saveSettings();
 });
-document.querySelectorAll('input[name="drainMode"]').forEach(r => {
-    r.addEventListener('change', () => {
-        clearDrainState();
-        updateBatteryDrain();
-        saveSettings();
+const drainVals = {
+    startH: [14, 16, 'drainStartHVal'],
+    startM: [0, 59, 'drainStartMVal'],
+    endH: [14, 16, 'drainEndHVal'],
+    endM: [0, 59, 'drainEndMVal'],
+};
+function drainGet(key) { return parseInt(document.getElementById(drainVals[key][2]).textContent) || drainVals[key][0]; }
+function drainSet(key, v) {
+    const [min, max, id] = drainVals[key];
+    v = Math.max(min, Math.min(max, v));
+    document.getElementById(id).textContent = key.endsWith('M') ? String(v).padStart(2, '0') : v;
+}
+let _drainRepeat = null;
+function drainStep(key, dir) {
+    let v = drainGet(key) + dir;
+    if (key.endsWith('M')) {
+        if (v < 0) v = 59;
+        if (v > 59) v = 0;
+    }
+    drainSet(key, v);
+}
+document.querySelectorAll('.drain-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        drainStep(btn.dataset.target, parseInt(btn.dataset.dir));
+        drainCustomChanged();
     });
+    btn.addEventListener('mousedown', () => {
+        const key = btn.dataset.target;
+        const dir = parseInt(btn.dataset.dir);
+        let count = 0;
+        const repeat = () => {
+            drainStep(key, dir);
+            drainCustomChanged();
+            count++;
+            const delay = count < 3 ? 300 : 80;
+            _drainRepeat = setTimeout(repeat, delay);
+        };
+        _drainRepeat = setTimeout(repeat, 400);
+    });
+    btn.addEventListener('mouseup', () => { clearTimeout(_drainRepeat); });
+    btn.addEventListener('mouseleave', () => { clearTimeout(_drainRepeat); });
 });
-function drainMode() {
-    const el = document.querySelector('input[name="drainMode"]:checked');
-    return el ? el.value : 'full';
+const drainCustomFields = document.getElementById('drainCustomFields');
+const drainTimeLabel = document.getElementById('drainTimeLabel');
+
+function drainCustomChanged() {
+    let sm = drainGet('startH') * 60 + drainGet('startM');
+    let em = drainGet('endH') * 60 + drainGet('endM');
+    sm = Math.max(14 * 60 + 40, Math.min(16 * 60 + 40, sm));
+    em = Math.max(14 * 60 + 40, Math.min(16 * 60 + 40, em));
+    if (em - sm < 5) {
+        em = sm + 5;
+        if (em > 16 * 60 + 40) { em = 16 * 60 + 40; sm = em - 5; }
+    }
+    drainSet('startH', Math.floor(sm / 60));
+    drainSet('startM', sm % 60);
+    drainSet('endH', Math.floor(em / 60));
+    drainSet('endM', em % 60);
+    clearDrainState();
+    updateBatteryDrain();
+    updateDrainTimeLabel();
+    saveSettings();
+}
+function updateDrainTimeLabel() {
+    const sh = String(drainGet('startH')).padStart(2, '0');
+    const sm = String(drainGet('startM')).padStart(2, '0');
+    const eh = String(drainGet('endH')).padStart(2, '0');
+    const em = String(drainGet('endM')).padStart(2, '0');
+    drainTimeLabel.textContent = sh + ':' + sm + ' – ' + eh + ':' + em;
 }
 function drainTimes() {
-    if (drainMode() === 'short') return { start: 15 * 60 + 20, end: 15 * 60 + 30 };
-    return { start: 14 * 60 + 40, end: 16 * 60 + 40 };
+    const a = drainGet('startH') * 60 + drainGet('startM');
+    const b = drainGet('endH') * 60 + drainGet('endM');
+    return { start: Math.min(a, b), end: Math.max(a, b) };
 }
 function clearDrainState() {
     clearDrainLayers();
     batteryDrainActive = false;
     _drainEnded = false;
 }
-function setDrainModesDisabled(state) {
-    document.getElementById('drainModes').classList.toggle('disabled', state);
-    document.querySelectorAll('input[name="drainMode"]').forEach(r => r.disabled = state);
+function setDrainVisibility(visible) {
+    drainCustomFields.style.display = visible ? '' : 'none';
+    drainTimeLabel.style.display = '';
+    updateDrainTimeLabel();
 }
-
 function saveSettings() {
     localStorage.setItem('trail_settings', JSON.stringify({
         mapLayer: document.getElementById('mapLayer').value,
@@ -627,7 +687,8 @@ function saveSettings() {
         chkUphill: chkUphill.checked,
         chk112: chk112.checked,
         chkDrain: chkDrain.checked,
-        drainMode: drainMode(),
+        drainStart: drainGet('startH') + ':' + String(drainGet('startM')).padStart(2, '0'),
+        drainEnd: drainGet('endH') + ':' + String(drainGet('endM')).padStart(2, '0'),
         timeScale: elTimeScale.value,
     }));
 }
@@ -822,7 +883,7 @@ function stopAnimation() {
     isPaused = false;
     elSpeed.disabled = false;
     elStartTime.disabled = false;
-    setDrainModesDisabled(!chkDrain.checked);
+    setDrainVisibility(chkDrain.checked);
     isAtEnd = false;
     alarmTriggered = false;
     _112Fired = {};
@@ -947,7 +1008,7 @@ function startAnimation() {
     isPaused = false;
     elSpeed.disabled = true;
     elStartTime.disabled = true;
-    setDrainModesDisabled(true);
+    setDrainVisibility(false);
     btnStart.disabled = true;
     btnStart.textContent = 'Start';
     btnPause.disabled = false;
@@ -1144,12 +1205,20 @@ function updateTimerDisplay(sec) {
 function updateBatteryDrain() {
     if (!isPlaying || !movingMarker) return;
 
-    if (!chkDrain || !chkDrain.checked) {
-        clearDrainState();
-        return;
+    const drainOn = chkDrain && chkDrain.checked;
+
+    if (!drainOn) {
+        clearDrainLayers();
+        batteryDrainActive = false;
     }
 
-    if (_drainEnded) return;
+    if (_drainEnded) {
+        if (drainOn && !batteryDrainActive) {
+            batteryDrainActive = true;
+            refreshDrainPath();
+        }
+        return;
+    }
 
     const st = getStartDateTime();
     if (!st) return;
@@ -1164,19 +1233,15 @@ function updateBatteryDrain() {
 
     if (simTotalMins > DRAIN_END) {
         if (!_drainEnded) {
-            if (!batteryDrainActive) {
-                batteryDrainActive = true;
-                if (!_drainStartSet) {
-                    _drainStartSet = true;
-                    const startMins = st.getHours() * 60 + st.getMinutes();
-                    const elapsed = simTotalMins - startMins;
-                    if (elapsed > 0 && simTotalMins > DRAIN_START) {
-                        _drainStartDist = traveledDistanceKm * Math.max(0, Math.min(1, (DRAIN_START - startMins) / elapsed));
-                    } else {
-                        _drainStartDist = traveledDistanceKm;
-                    }
+            if (!_drainStartSet) {
+                _drainStartSet = true;
+                const startMins = st.getHours() * 60 + st.getMinutes();
+                const elapsed = simTotalMins - startMins;
+                if (elapsed > 0 && simTotalMins > DRAIN_START) {
+                    _drainStartDist = traveledDistanceKm * Math.max(0, Math.min(1, (DRAIN_START - startMins) / elapsed));
+                } else {
+                    _drainStartDist = traveledDistanceKm;
                 }
-                _drainLastUpdateDist = traveledDistanceKm;
             }
             if (_drainEndDist <= 0) {
                 const startMins = st.getHours() * 60 + st.getMinutes();
@@ -1186,50 +1251,55 @@ function updateBatteryDrain() {
                     : traveledDistanceKm;
             }
             _drainEnded = true;
-            refreshDrainPath();
+            if (drainOn) {
+                batteryDrainActive = true;
+                _drainLastUpdateDist = traveledDistanceKm;
+                refreshDrainPath();
+            }
         }
         return;
     }
 
-    if (!batteryDrainActive) {
-        batteryDrainActive = true;
+    if (!_drainStartSet) {
+        _drainStartSet = true;
+        const startMins = st.getHours() * 60 + st.getMinutes();
+        const elapsed = simTotalMins - startMins;
+        if (elapsed > 0 && simTotalMins > DRAIN_START) {
+            const frac = Math.max(0, Math.min(1, (DRAIN_START - startMins) / elapsed));
+            _drainStartDist = traveledDistanceKm * frac;
+        } else {
+            _drainStartDist = traveledDistanceKm;
+        }
+    }
+    if (drainOn) {
+        if (!batteryDrainActive) {
+            batteryDrainActive = true;
+            _drainStopActive = false;
+            _drainLastUpdateDist = traveledDistanceKm;
+            refreshDrainPath();
+        }
+
+        if (activeStopIndex >= 0) {
+            if (!_drainStopActive) {
+                _drainStopActive = true;
+                const pos = movingMarker.getLatLng();
+                const dot = L.circle(pos, {
+                    radius: 10, color: 'transparent', weight: 0,
+                    fillColor: '#e91e63', fillOpacity: 0.35,
+                    interactive: false, renderer: drainRenderer,
+                }).addTo(map);
+                _drainStopDots.push(dot);
+            }
+            return;
+        }
+
         _drainStopActive = false;
 
-        if (!_drainStartSet) {
-            _drainStartSet = true;
-            const startMins = st.getHours() * 60 + st.getMinutes();
-            const elapsed = simTotalMins - startMins;
-            if (elapsed > 0 && simTotalMins > DRAIN_START) {
-                const frac = Math.max(0, Math.min(1, (DRAIN_START - startMins) / elapsed));
-                _drainStartDist = traveledDistanceKm * frac;
-            } else {
-                _drainStartDist = traveledDistanceKm;
-            }
-        }
+        if (traveledDistanceKm - _drainLastUpdateDist < 0.005) return;
+
         _drainLastUpdateDist = traveledDistanceKm;
         refreshDrainPath();
     }
-
-    if (activeStopIndex >= 0) {
-        if (!_drainStopActive) {
-            _drainStopActive = true;
-            const pos = movingMarker.getLatLng();
-            const dot = L.circle(pos, {
-                radius: 10, color: 'transparent', weight: 0,
-                fillColor: '#e91e63', fillOpacity: 0.35,
-                interactive: false, renderer: drainRenderer,
-            }).addTo(map);
-            _drainStopDots.push(dot);
-        }
-        return;
-    }
-
-    _drainStopActive = false;
-
-    if (traveledDistanceKm - _drainLastUpdateDist < 0.005) return;
-
-    _drainLastUpdateDist = traveledDistanceKm;
-    refreshDrainPath();
 }
 
 function refreshDrainPath() {
@@ -1309,11 +1379,11 @@ btnPause.addEventListener('click', () => {
         isPaused = true;
         btnPause.textContent = 'Resume';
         setStatus('Paused', '');
-        setDrainModesDisabled(true);
+        setDrainVisibility(false);
     } else {
         isPaused = false;
         btnPause.textContent = 'Pause';
-        setDrainModesDisabled(true);
+        setDrainVisibility(false);
         lastFrameTimestamp = performance.now();
         const val = parseFloat(elSpeed.value) || 0;
         _currentSpeedKmh = elSpeedUnit.value === 'mph' ? val / 0.621371 : val;
@@ -1611,11 +1681,15 @@ try {
     }
     if (saved && saved.chkDrain !== undefined) {
         document.getElementById('chkDrain').checked = saved.chkDrain;
-        setDrainModesDisabled(!saved.chkDrain);
+        setDrainVisibility(saved.chkDrain);
     }
-    if (saved && saved.drainMode) {
-        const r = document.querySelector(`input[name="drainMode"][value="${saved.drainMode}"]`);
-        if (r) r.checked = true;
+    if (saved && saved.drainStart) {
+        const [h, m] = saved.drainStart.split(':');
+        drainSet('startH', parseInt(h)); drainSet('startM', parseInt(m));
+    }
+    if (saved && saved.drainEnd) {
+        const [h, m] = saved.drainEnd.split(':');
+        drainSet('endH', parseInt(h)); drainSet('endM', parseInt(m));
     }
     if (saved && saved.timeScale) {
         elTimeScale.value = saved.timeScale;
@@ -2345,7 +2419,8 @@ document.getElementById('btnExport').addEventListener('click', async () => {
             chkUphill: document.getElementById('chkUphill').checked,
             chk112: document.getElementById('chk112').checked,
             chkDrain: document.getElementById('chkDrain').checked,
-            drainMode: drainMode(),
+            drainStart: drainGet('startH') + ':' + String(drainGet('startM')).padStart(2, '0'),
+            drainEnd: drainGet('endH') + ':' + String(drainGet('endM')).padStart(2, '0'),
             timeScale: elTimeScale.value,
             startTime: elStartTime.value,
             speed: elSpeed.value,
@@ -2429,11 +2504,15 @@ document.getElementById('importFile').addEventListener('change', async function 
                 }
                 if (s.chkDrain !== undefined) {
                     document.getElementById('chkDrain').checked = s.chkDrain;
-                    setDrainModesDisabled(!s.chkDrain);
+                    setDrainVisibility(s.chkDrain);
                 }
-                if (s.drainMode) {
-                    const r = document.querySelector(`input[name="drainMode"][value="${s.drainMode}"]`);
-                    if (r) r.checked = true;
+                if (s.drainStart) {
+                    const [h, m] = s.drainStart.split(':');
+        drainSet('startH', h); drainSet('startM', m);
+                }
+                if (s.drainEnd) {
+                    const [h, m] = s.drainEnd.split(':');
+        drainSet('endH', h); drainSet('endM', m);
                 }
                 if (s.timeScale !== undefined) {
                     elTimeScale.value = s.timeScale;

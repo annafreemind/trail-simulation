@@ -170,16 +170,37 @@
                 <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#aabbdd;cursor:pointer;padding:1px 0">
                     <input type="checkbox" id="chkDrain" style="accent-color:#4a7cf7;width:14px;height:14px;cursor:pointer" />
                     Battery drain overlay
+                    <span id="drainTimeLabel" style="font-size:10px;color:#8899bb;display:none"></span>
                 </label>
-                <div id="drainModes" style="margin-top:-4px;padding:0 0 0 20px;font-size:11px;color:#aabbdd">
-                    <label style="display:flex;align-items:center;gap:4px;cursor:pointer;padding:1px 0">
-                        <input type="radio" name="drainMode" value="full" checked style="accent-color:#4a7cf7;width:12px;height:12px;cursor:pointer" />
-                        ~ 14:40 – 16:40
-                    </label>
-                    <label style="display:flex;align-items:center;gap:4px;cursor:pointer;padding:1px 0">
-                        <input type="radio" name="drainMode" value="short" style="accent-color:#4a7cf7;width:12px;height:12px;cursor:pointer" />
-                        ~ 15:20 – 15:30
-                    </label>
+                <div id="drainCustomFields" style="display:none;padding:0 0 0 20px;font-size:10px;color:#8899bb">
+                    <div style="display:flex;align-items:center;gap:1px;padding:1px 0">
+                        <span id="drainStartHVal" style="width:22px;text-align:center;color:#f0f4ff;font-size:11px">14</span>
+                        <div style="display:flex;flex-direction:column;gap:0">
+                            <button class="drain-btn drain-arr" data-target="startH" data-dir="1">▲</button>
+                            <button class="drain-btn drain-arr" data-target="startH" data-dir="-1">▼</button>
+                        </div>
+                        :
+                        <span id="drainStartMVal" style="width:22px;text-align:center;color:#f0f4ff;font-size:11px">40</span>
+                        <div style="display:flex;flex-direction:column;gap:0">
+                            <button class="drain-btn drain-arr" data-target="startM" data-dir="1">▲</button>
+                            <button class="drain-btn drain-arr" data-target="startM" data-dir="-1">▼</button>
+                        </div>
+                        <span style="color:#667;margin:0 4px">–</span>
+                        <span id="drainEndHVal" style="width:22px;text-align:center;color:#f0f4ff;font-size:11px">16</span>
+                        <div style="display:flex;flex-direction:column;gap:0">
+                            <button class="drain-btn drain-arr" data-target="endH" data-dir="1">▲</button>
+                            <button class="drain-btn drain-arr" data-target="endH" data-dir="-1">▼</button>
+                        </div>
+                        :
+                        <span id="drainEndMVal" style="width:22px;text-align:center;color:#f0f4ff;font-size:11px">40</span>
+                        <div style="display:flex;flex-direction:column;gap:0">
+                            <button class="drain-btn drain-arr" data-target="endM" data-dir="1">▲</button>
+                            <button class="drain-btn drain-arr" data-target="endM" data-dir="-1">▼</button>
+                        </div>
+                        <span class="help-icon" tabindex="0" style="font-size:9px;width:13px;height:13px;line-height:13px;margin-left:6px">?
+                            <span class="tooltip-text" style="width:200px">Start and end times must be between 14:40 and 16:40. Minimum interval — 5 minutes.</span>
+                        </span>
+                    </div>
                 </div>
 
                 <div style="border-top:1px solid #2a3a5e;margin:6px 0"></div>

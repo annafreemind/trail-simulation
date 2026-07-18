@@ -723,45 +723,37 @@ input:disabled, select:disabled {
     opacity: 0.4;
     cursor: default;
 }
-#drainModes input[type="radio"] {
-    appearance: none;
-    -webkit-appearance: none;
-    width: 14px;
-    height: 14px;
-    border: 2px solid #556;
-    border-radius: 50%;
-    margin: 0;
-    position: relative;
+.drain-btn {
+    width: 16px;
+    height: 16px;
+    padding: 0;
+    line-height: 1;
+    font-size: 11px;
+    border: 1px solid #2a3a5e;
+    border-radius: 3px;
+    background: #0f1a30;
+    color: #8899bb;
     cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     flex-shrink: 0;
-    transition: border-color .2s;
 }
-#drainModes input[type="radio"]:hover {
-    border-color: #8899bb;
+.drain-btn:hover {
+    background: #1a2a4a;
+    color: #f0f4ff;
 }
-#drainModes input[type="radio"]:checked {
-    border-color: #4a7cf7;
+.drain-arr {
+    width: 14px;
+    height: 9px;
+    font-size: 6px;
+    border-radius: 2px;
+    line-height: 1;
+    background: #667aad;
+    color: #0a1220;
+}
+.drain-arr:hover {
     background: #4a7cf7;
-}
-#drainModes input[type="radio"]:checked::after {
-    content: '';
-    position: absolute;
-    width: 4px;
-    height: 4px;
-    border-radius: 50%;
-    background: #fff;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    box-shadow: 0 0 3px rgba(0,0,0,.3);
-}
-#drainModes.disabled label {
-    cursor: default;
-}
-#drainModes.disabled label:not(:has(input:checked)) {
-    opacity: 0.4;
-}
-#drainModes.disabled input[type="radio"] {
-    cursor: default;
+    color: #fff;
 }
 
