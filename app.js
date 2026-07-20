@@ -124,10 +124,15 @@ const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/
     attribution: '&copy; Esri, Maxar, Earthstar Geographics, and the GIS User Community',
 });
 
+const wayback2014Layer = L.tileLayer('https://wayback.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/WMTS/1.0.0/default028mm/MapServer/tile/10/{z}/{y}/{x}', {
+    maxZoom: 19,
+    attribution: '&copy; Esri, ArcGIS, World Imagery Wayback 2014',
+});
+
 let currentLayer = osmLayer;
 
 document.getElementById('mapLayer').addEventListener('change', function() {
-    const layerMap = { osm: osmLayer, topo: topoLayer, satellite: satelliteLayer };
+    const layerMap = { osm: osmLayer, topo: topoLayer, satellite: satelliteLayer, wayback2014: wayback2014Layer };
     const newLayer = layerMap[this.value];
     if (newLayer && newLayer !== currentLayer) {
         const center = map.getCenter();
