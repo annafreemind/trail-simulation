@@ -170,6 +170,38 @@ input:disabled, select:disabled {
     border-color: #4a7cf7;
 }
 
+.btn-3d-toggle {
+    padding: 6px 24px;
+    background: rgba(74, 124, 247, 0.1);
+    border: 1px solid #3a5a9e;
+    border-radius: 5px;
+    color: #aabbdd;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all .2s;
+    white-space: nowrap;
+    height: 100%;
+}
+.btn-3d-toggle:hover:not(:disabled) {
+    border-color: #4a7cf7;
+    color: #fff;
+    background: rgba(74, 124, 247, 0.2);
+}
+.btn-3d-toggle.active {
+    background: #4a7cf7;
+    color: #fff;
+    border-color: #4a7cf7;
+    box-shadow: 0 0 10px rgba(74, 124, 247, 0.25);
+}
+.btn-3d-toggle.active:hover:not(:disabled) {
+    background: #5a8cf7;
+}
+.btn-3d-toggle:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
 .tab-btn {
     flex: 1;
     padding: 7px 0;
@@ -252,6 +284,28 @@ input:disabled, select:disabled {
 #map {
     flex: 1;
     height: 100%;
+}
+#map3d {
+    flex: 1;
+    height: 100%;
+}
+.map3d-marker-label {
+    pointer-events: none;
+    white-space: nowrap;
+}
+.map3d-label-text {
+    background: rgba(10, 21, 40, 0.8);
+    color: #f0f4ff;
+    font-size: 10px;
+    padding: 1px 4px;
+    border-radius: 3px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+.map3d-marker-icon {
+    font-size: 16px;
+    text-shadow: 0 0 3px rgba(0,0,0,0.5);
+    text-align: center;
+    line-height: 1;
 }
 
 #sunView {

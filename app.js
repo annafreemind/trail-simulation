@@ -132,17 +132,384 @@ const wayback2014Layer = L.tileLayer('https://wayback.maptiles.arcgis.com/arcgis
 let currentLayer = osmLayer;
 
 document.getElementById('mapLayer').addEventListener('change', function() {
-    const layerMap = { osm: osmLayer, topo: topoLayer, satellite: satelliteLayer, wayback2014: wayback2014Layer };
-    const newLayer = layerMap[this.value];
-    if (newLayer && newLayer !== currentLayer) {
-        const center = map.getCenter();
-        const zoom = map.getZoom();
-        map.removeLayer(currentLayer);
-        newLayer.addTo(map);
-        currentLayer = newLayer;
-        map.setView(center, Math.min(zoom, newLayer.options.maxZoom));
+    const is3DActive = map3d && document.getElementById('btn3D').classList.contains('active');
+
+    if (is3DActive) {
+        const tileUrl = TILE_URLS_3D[this.value] || TILE_URLS_3D.osm;
+        const src = map3d.getSource('imagery');
+        if (src) {
+            src.setTiles([tileUrl]);
+            syncMap3dStaticLayers();
+            syncMap3dDrain();
+        }
+    } else {
+        const layerMap = { osm: osmLayer, topo: topoLayer, satellite: satelliteLayer, wayback2014: wayback2014Layer };
+        const newLayer = layerMap[this.value];
+        if (newLayer && newLayer !== currentLayer) {
+            map.removeLayer(currentLayer);
+            newLayer.addTo(map);
+            currentLayer = newLayer;
+        }
     }
     saveSettings();
+});
+
+const TILE_URLS_3D = {
+    osm: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+    topo: 'https://tile.opentopomap.org/{z}/{x}/{y}.png',
+    satellite: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    wayback2014: 'https://wayback.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/WMTS/1.0.0/default028mm/MapServer/tile/10/{z}/{y}/{x}',
+};
+
+let map3d = null;
+let _map3dPhotoMarkers = [];
+let _map3dPoiMarkers = [];
+let _map3dStopLabels = [];
+let _map3dSpeedLabels = [];
+let _map3dCustomLabels = [];
+let _map3d112Labels = [];
+
+function initMap3D() {
+    if (map3d) return;
+
+    const layerKey = document.getElementById('mapLayer').value;
+    const tileUrl = TILE_URLS_3D[layerKey] || TILE_URLS_3D.osm;
+
+    map3d = new maplibregl.Map({
+        container: 'map3d',
+        center: [map.getCenter().lng, map.getCenter().lat],
+        zoom: Math.min(map.getZoom(), 15),
+        pitch: 60,
+        localFontFamily: 'Arial, sans-serif',
+        style: {
+            version: 8,
+            sources: {
+                imagery: {
+                    type: 'raster',
+                    tiles: [tileUrl],
+                    tileSize: 256,
+                    maxzoom: 19,
+                },
+                terrainSource: {
+                    type: 'raster-dem',
+                    tiles: ['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'],
+                    tileSize: 256,
+                    encoding: 'terrarium',
+                    maxzoom: 15,
+                },
+            },
+            layers: [{
+                id: 'imagery',
+                type: 'raster',
+                source: 'imagery',
+            }],
+            terrain: { source: 'terrainSource', exaggeration: 1.5 },
+        },
+    });
+
+    map3d.once('load', () => {
+        if (!map3d) return;
+        map3d.addControl(new maplibregl.NavigationControl());
+        map3d.addControl(new maplibregl.TerrainControl({ source: 'terrainSource', exaggeration: 1.5 }));
+
+        // Camera icon for photos
+        const camCanvas = document.createElement('canvas');
+        camCanvas.width = 36; camCanvas.height = 36;
+        const ctx = camCanvas.getContext('2d');
+        ctx.font = '26px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('📷', 18, 18);
+        if (!map3d.hasImage('camera-icon')) {
+            map3d.addImage('camera-icon', ctx.getImageData(0, 0, 36, 36), { pixelRatio: 2 });
+        }
+
+        syncMap3dStaticLayers();
+        syncMap3dDrain();
+        updateMap3dPoiVisibility();
+        if (isPlaying && movingMarker) {
+            addMap3dMarker();
+            updateMap3dMarker(movingMarker.getLatLng());
+        }
+    });
+}
+
+function _map3dUpsert(id, geoJSON) {
+    const src = map3d.getSource(id);
+    if (src) { src.setData(geoJSON); return; }
+    map3d.addSource(id, { type: 'geojson', data: geoJSON });
+}
+
+function _map3dLayer(id, type, source, paint, layout) {
+    if (map3d.getLayer(id)) return;
+    const opts = { id, type, source };
+    if (paint) opts.paint = paint;
+    if (layout) opts.layout = layout;
+    map3d.addLayer(opts);
+}
+
+function syncMap3dStaticLayers() {
+    if (!map3d) return;
+
+    if (waypoints.length >= 2) {
+        const coords = waypoints.map(p => [p.lng, p.lat]);
+
+        _map3dUpsert('route-start', { type: 'Point', coordinates: coords[0] });
+        _map3dLayer('route-start', 'circle', 'route-start', { 'circle-radius': 6, 'circle-color': '#27ae60' });
+
+        _map3dUpsert('route-end', { type: 'Point', coordinates: coords[coords.length - 1] });
+        _map3dLayer('route-end', 'circle', 'route-end', { 'circle-radius': 6, 'circle-color': '#e74c3c' });
+
+        _map3dUpsert('route', { type: 'Feature', geometry: { type: 'LineString', coordinates: coords } });
+        _map3dLayer('route-line', 'line', 'route', { 'line-color': '#4a7cf7', 'line-width': 4 });
+
+        _map3dUpsert('waypoints', { type: 'FeatureCollection', features: waypoints.map(p => ({ type: 'Feature', geometry: { type: 'Point', coordinates: [p.lng, p.lat] } })) });
+        _map3dLayer('waypoints', 'circle', 'waypoints', { 'circle-radius': 3, 'circle-color': '#4a7cf7', 'circle-stroke-width': 2, 'circle-stroke-color': '#fff' });
+    }
+
+    if (scheduledStops.length > 0) {
+        _map3dUpsert('stops', { type: 'FeatureCollection', features: scheduledStops.map(s => ({ type: 'Feature', geometry: { type: 'Point', coordinates: [s.latlng.lng, s.latlng.lat] } })) });
+        _map3dLayer('stops', 'circle', 'stops', { 'circle-radius': 4, 'circle-color': '#f39c12', 'circle-stroke-width': 2, 'circle-stroke-color': '#fff' });
+        _map3dStopLabels.forEach(m => m.remove());
+        _map3dStopLabels = [];
+        if (chkLabels.checked) {
+            scheduledStops.forEach(s => {
+                const el = document.createElement('div');
+                el.className = 'map3d-marker-label';
+                el.innerHTML = `<span class="map3d-label-text">${s.label} (${formatStopDuration(s.duration)})</span>`;
+                const marker = new maplibregl.Marker({ element: el, anchor: 'bottom', offset: [0, -10] }).setLngLat([s.latlng.lng, s.latlng.lat]).addTo(map3d);
+                _map3dStopLabels.push(marker);
+            });
+        }
+    }
+
+    if (speedPoints.length > 0) {
+        _map3dUpsert('speeds', { type: 'FeatureCollection', features: speedPoints.map(s => ({ type: 'Feature', geometry: { type: 'Point', coordinates: [s.latlng.lng, s.latlng.lat] } })) });
+        _map3dLayer('speeds', 'circle', 'speeds', { 'circle-radius': 4, 'circle-color': '#2ecc71', 'circle-stroke-width': 2, 'circle-stroke-color': '#fff' });
+        _map3dSpeedLabels.forEach(m => m.remove());
+        _map3dSpeedLabels = [];
+        if (chkLabels.checked) {
+            speedPoints.forEach(s => {
+                const el = document.createElement('div');
+                el.className = 'map3d-marker-label';
+                el.innerHTML = `<span class="map3d-label-text">${s.label} (${formatSpeed(s.speed)})</span>`;
+                const marker = new maplibregl.Marker({ element: el, anchor: 'bottom', offset: [0, -10] }).setLngLat([s.latlng.lng, s.latlng.lat]).addTo(map3d);
+                _map3dSpeedLabels.push(marker);
+            });
+        }
+    }
+
+    if (customPoints.length > 0) {
+        _map3dUpsert('customs', { type: 'FeatureCollection', features: customPoints.map(s => ({ type: 'Feature', geometry: { type: 'Point', coordinates: [s.latlng.lng, s.latlng.lat] } })) });
+        _map3dLayer('customs', 'circle', 'customs', { 'circle-radius': 4, 'circle-color': '#9b59b6', 'circle-stroke-width': 2, 'circle-stroke-color': '#fff' });
+        _map3dCustomLabels.forEach(m => m.remove());
+        _map3dCustomLabels = [];
+        if (chkLabels.checked) {
+            customPoints.forEach(s => {
+                const el = document.createElement('div');
+                el.className = 'map3d-marker-label';
+                el.innerHTML = `<span class="map3d-label-text">${s.label}</span>`;
+                const marker = new maplibregl.Marker({ element: el, anchor: 'bottom', offset: [0, -10] }).setLngLat([s.latlng.lng, s.latlng.lat]).addTo(map3d);
+                _map3dCustomLabels.push(marker);
+            });
+        }
+    }
+
+    if (typeof PHOTOS !== 'undefined' && PHOTOS.length > 0) {
+        _map3dUpsert('poi-photos', { type: 'FeatureCollection', features: PHOTOS.map(p => ({ type: 'Feature', properties: { photo: p.photo, time: p.time, desc: p.desc }, geometry: { type: 'Point', coordinates: [p.lng, p.lat] } })) });
+        _map3dLayer('poi-photos', 'symbol', 'poi-photos', null, { 'icon-image': 'camera-icon', 'icon-size': 1.2, 'icon-anchor': 'bottom' });
+        _map3dPhotoMarkers.forEach(m => m.remove());
+        _map3dPhotoMarkers = [];
+        if (chkPoiLabels.checked) {
+            PHOTOS.forEach(p => {
+                const el = document.createElement('div');
+                el.className = 'map3d-marker-label';
+                el.innerHTML = `<span class="map3d-label-text">${p.photo} · ${p.time}</span>`;
+                const marker = new maplibregl.Marker({ element: el, anchor: 'bottom', offset: [0, -20] }).setLngLat([p.lng, p.lat]).addTo(map3d);
+                _map3dPhotoMarkers.push(marker);
+            });
+        }
+    }
+
+    if (typeof POIS !== 'undefined' && POIS.length > 0) {
+        _map3dUpsert('poi-points', { type: 'FeatureCollection', features: POIS.map(p => ({ type: 'Feature', properties: { label: p.name }, geometry: { type: 'Point', coordinates: [p.lng, p.lat] } })) });
+        _map3dLayer('poi-points', 'circle', 'poi-points', { 'circle-radius': 14, 'circle-color': 'transparent', 'circle-stroke-width': 2, 'circle-stroke-color': '#e74c3c' });
+        _map3dPoiMarkers.forEach(m => m.remove());
+        _map3dPoiMarkers = [];
+        if (chkPoiLabels.checked) {
+            POIS.forEach(p => {
+                const el = document.createElement('div');
+                el.className = 'map3d-marker-label';
+                el.innerHTML = `<span class="map3d-label-text">${p.name}</span>`;
+                const marker = new maplibregl.Marker({ element: el, anchor: 'bottom', offset: [0, -14] }).setLngLat([p.lng, p.lat]).addTo(map3d);
+                _map3dPoiMarkers.push(marker);
+            });
+        }
+    }
+}
+
+function syncMap3dDrain() {
+    if (!map3d) return;
+
+    if (!batteryDrainActive && !batteryDrainLine) {
+        if (map3d.getLayer('drain-line')) map3d.removeLayer('drain-line');
+        if (map3d.getSource('drain-line')) map3d.removeSource('drain-line');
+        if (map3d.getLayer('drain-dots')) map3d.removeLayer('drain-dots');
+        if (map3d.getSource('drain-dots')) map3d.removeSource('drain-dots');
+        return;
+    }
+
+    if (batteryDrainActive && batteryDrainLine) {
+        const latlngs = batteryDrainLine.getLatLngs();
+        if (latlngs && latlngs.length >= 2) {
+            const coords = latlngs.map(p => [p.lng, p.lat]);
+            const src = map3d.getSource('drain-line');
+            if (src) {
+                src.setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: coords } });
+            } else {
+                map3d.addSource('drain-line', { type: 'geojson', data: { type: 'Feature', geometry: { type: 'LineString', coordinates: coords } } });
+                map3d.addLayer({ id: 'drain-line', type: 'line', source: 'drain-line', paint: { 'line-color': '#e91e63', 'line-width': 10, 'line-opacity': 0.5 } });
+            }
+        }
+    }
+
+    if (_drainStopDots.length > 0) {
+        const features = _drainStopDots.map(d => { const p = d.getLatLng(); return { type: 'Feature', geometry: { type: 'Point', coordinates: [p.lng, p.lat] } }; });
+        const src = map3d.getSource('drain-dots');
+        if (src) {
+            src.setData({ type: 'FeatureCollection', features });
+        } else {
+            map3d.addSource('drain-dots', { type: 'geojson', data: { type: 'FeatureCollection', features } });
+            map3d.addLayer({ id: 'drain-dots', type: 'circle', source: 'drain-dots', paint: { 'circle-radius': 10, 'circle-color': '#e91e63', 'circle-opacity': 0.5 } });
+        }
+    } else {
+        if (map3d.getLayer('drain-dots')) map3d.removeLayer('drain-dots');
+        if (map3d.getSource('drain-dots')) map3d.removeSource('drain-dots');
+    }
+}
+
+function syncMap3d112() {
+    if (!map3d) return;
+    _map3d112Labels.forEach(m => m.remove());
+    _map3d112Labels = [];
+    if (_112Points.length === 0) {
+        if (map3d.getLayer('112-markers')) map3d.removeLayer('112-markers');
+        if (map3d.getSource('112-markers')) map3d.removeSource('112-markers');
+        return;
+    }
+
+    _map3dUpsert('112-markers', { type: 'FeatureCollection', features: _112Points.map(p => ({ type: 'Feature', geometry: { type: 'Point', coordinates: [p.latlng.lng, p.latlng.lat] } })) });
+    _map3dLayer('112-markers', 'circle', '112-markers', { 'circle-radius': 4, 'circle-color': '#e74c3c', 'circle-stroke-width': 2, 'circle-stroke-color': '#fff' });
+    if (chkLabels.checked) {
+        _112Points.forEach(p => {
+            const el = document.createElement('div');
+            el.className = 'map3d-marker-label';
+            el.innerHTML = `<span class="map3d-label-text">${p.label}</span>`;
+            const marker = new maplibregl.Marker({ element: el, anchor: 'bottom', offset: [0, -10] }).setLngLat([p.latlng.lng, p.latlng.lat]).addTo(map3d);
+            _map3d112Labels.push(marker);
+        });
+    }
+}
+
+function updateMap3dPoiVisibility() {
+    if (!map3d) return;
+    const iconsVis = chkPoi.checked ? 'visible' : 'none';
+    ['poi-photos', 'poi-points'].forEach(id => { if (map3d.getLayer(id)) map3d.setLayoutProperty(id, 'visibility', iconsVis); });
+    if (chkPoi.checked && chkPoiLabels.checked) {
+        if (_map3dPhotoMarkers.length === 0 && typeof PHOTOS !== 'undefined') {
+            PHOTOS.forEach(p => {
+                const el = document.createElement('div');
+                el.className = 'map3d-marker-label';
+                el.innerHTML = `<span class="map3d-label-text">${p.photo} · ${p.time}</span>`;
+                const marker = new maplibregl.Marker({ element: el, anchor: 'bottom', offset: [0, -20] }).setLngLat([p.lng, p.lat]).addTo(map3d);
+                _map3dPhotoMarkers.push(marker);
+            });
+        }
+        if (_map3dPoiMarkers.length === 0 && typeof POIS !== 'undefined') {
+            POIS.forEach(p => {
+                const el = document.createElement('div');
+                el.className = 'map3d-marker-label';
+                el.innerHTML = `<span class="map3d-label-text">${p.name}</span>`;
+                const marker = new maplibregl.Marker({ element: el, anchor: 'bottom', offset: [0, -14] }).setLngLat([p.lng, p.lat]).addTo(map3d);
+                _map3dPoiMarkers.push(marker);
+            });
+        }
+    } else {
+        _map3dPhotoMarkers.forEach(m => m.remove());
+        _map3dPhotoMarkers = [];
+        _map3dPoiMarkers.forEach(m => m.remove());
+        _map3dPoiMarkers = [];
+    }
+}
+
+function addMap3dMarker() {
+    if (!map3d) return;
+    const pos = [waypoints[0].lng, waypoints[0].lat];
+    _map3dUpsert('move-marker', { type: 'Point', coordinates: pos });
+    _map3dLayer('move-marker-layer', 'circle', 'move-marker', {
+        'circle-radius': 8, 'circle-color': '#e74c3c', 'circle-stroke-width': 2, 'circle-stroke-color': '#fff' });
+}
+
+function updateMap3dMarker(latlng) {
+    if (!map3d) return;
+    const src = map3d.getSource('move-marker');
+    if (src) src.setData({ type: 'Point', coordinates: [latlng.lng, latlng.lat] });
+}
+
+function removeMap3dMarker() {
+    if (!map3d) return;
+    if (map3d.getLayer('move-marker-layer')) map3d.removeLayer('move-marker-layer');
+    if (map3d.getSource('move-marker')) map3d.removeSource('move-marker');
+}
+
+function toggleMap3D() {
+    const active = document.getElementById('btn3D').classList.contains('active');
+
+    if (active) {
+        document.getElementById('map').style.display = 'none';
+        document.getElementById('map3d').style.display = 'block';
+        initMap3D();
+        map3d.resize();
+        map3d.jumpTo({ center: [map.getCenter().lng, map.getCenter().lat], zoom: Math.min(map.getZoom(), 15) });
+    } else {
+        if (map3d) {
+            const c = map3d.getCenter();
+
+            const layerKey = document.getElementById('mapLayer').value;
+            const layerMap = { osm: osmLayer, topo: topoLayer, satellite: satelliteLayer, wayback2014: wayback2014Layer };
+            const newLayer = layerMap[layerKey];
+            if (newLayer && newLayer !== currentLayer) {
+                if (currentLayer) map.removeLayer(currentLayer);
+                newLayer.addTo(map);
+                currentLayer = newLayer;
+            }
+
+            map.setView([c.lat, c.lng], map3d.getZoom());
+        _map3dPhotoMarkers.forEach(m => m.remove());
+        _map3dPhotoMarkers = [];
+        _map3dPoiMarkers.forEach(m => m.remove());
+        _map3dPoiMarkers = [];
+        _map3dStopLabels.forEach(m => m.remove());
+        _map3dStopLabels = [];
+        _map3dSpeedLabels.forEach(m => m.remove());
+        _map3dSpeedLabels = [];
+        _map3dCustomLabels.forEach(m => m.remove());
+        _map3dCustomLabels = [];
+        _map3d112Labels.forEach(m => m.remove());
+        _map3d112Labels = [];
+        map3d.remove();
+        map3d = null;
+        }
+        document.getElementById('map').style.display = 'block';
+        document.getElementById('map3d').style.display = 'none';
+        map.invalidateSize();
+    }
+    saveSettings();
+}
+
+document.getElementById('btn3D').addEventListener('click', function() {
+    this.classList.toggle('active');
+    toggleMap3D();
 });
 
 const poiIcons = L.layerGroup().addTo(map);
@@ -404,6 +771,7 @@ function redrawPath() {
         }).addTo(map);
         markers.push(m);
     });
+    syncMap3dStaticLayers();
 }
 
 function updateInfo() {
@@ -575,6 +943,7 @@ chkPoi.addEventListener('change', () => {
         map.removeLayer(poiIcons);
         map.removeLayer(poiLabels);
     }
+    updateMap3dPoiVisibility();
     saveSettings();
 });
 chkPoiLabels.addEventListener('change', () => {
@@ -583,6 +952,7 @@ chkPoiLabels.addEventListener('change', () => {
     } else {
         map.removeLayer(poiLabels);
     }
+    updateMap3dPoiVisibility();
     saveSettings();
 });
 
@@ -758,6 +1128,7 @@ function renderScheduledStops() {
     });
     renderRoutePoints();
     renderNavList();
+    syncMap3dStaticLayers();
 }
 
 function renderSpeedPoints() {
@@ -779,6 +1150,7 @@ function renderSpeedPoints() {
     });
     renderRoutePoints();
     renderNavList();
+    syncMap3dStaticLayers();
 }
 
 function renderCustomPoints() {
@@ -799,6 +1171,7 @@ function renderCustomPoints() {
         customPointMarkers.push(m);
     });
     renderRoutePoints();
+    syncMap3dStaticLayers();
 }
 
 routePointList.addEventListener('click', (e) => {
@@ -867,6 +1240,7 @@ function render112Points() {
         }
         _112PointMarkers.push(m);
     });
+    syncMap3d112();
 }
 
 // ============================================================
@@ -883,11 +1257,13 @@ function stopAnimation() {
     if (movingMarker) {
         map.removeLayer(movingMarker);
         movingMarker = null;
+        removeMap3dMarker();
     }
     isPlaying = false;
     isPaused = false;
     elSpeed.disabled = false;
     elStartTime.disabled = false;
+    document.getElementById('btn3D').disabled = false;
     setDrainVisibility(chkDrain.checked);
     isAtEnd = false;
     alarmTriggered = false;
@@ -895,6 +1271,7 @@ function stopAnimation() {
     _112PointMarkers.forEach(m => map.removeLayer(m));
     _112Points = [];
     _112PointMarkers = [];
+    syncMap3d112();
     traveledDistanceKm = 0;
     simElapsedSeconds = 0;
     _prevSimSec = -1;
@@ -995,6 +1372,7 @@ function startAnimation() {
             iconAnchor: [9, 9],
         });
         movingMarker = L.marker(waypoints[0], { icon, zIndexOffset: 1000 }).addTo(map);
+        addMap3dMarker();
     }
 
     isAtEnd = false;
@@ -1009,10 +1387,12 @@ function startAnimation() {
     _drainLastUpdateDist = 0;
     _drainEnded = false;
     clearDrainLayers();
+    syncMap3dDrain();
     isPlaying = true;
     isPaused = false;
     elSpeed.disabled = true;
     elStartTime.disabled = true;
+    document.getElementById('btn3D').disabled = true;
     setDrainVisibility(false);
     btnStart.disabled = true;
     btnStart.textContent = 'Start';
@@ -1069,6 +1449,7 @@ function animationLoop(timestamp) {
             updateCurrentTime(simElapsedSeconds);
             infoCurrentSpeed.textContent = formatSpeed(getSpeedKmh());
             updateBatteryDrain();
+            syncMap3dDrain();
             animationId = requestAnimationFrame(animationLoop);
             return;
         }
@@ -1076,6 +1457,7 @@ function animationLoop(timestamp) {
         updateCurrentTime(simElapsedSeconds);
         infoCurrentSpeed.textContent = '0 ' + speedUnit();
         updateBatteryDrain();
+        syncMap3dDrain();
         setStatus(`Waiting at "${scheduledStops[activeStopIndex].label}" — ${Math.ceil(stopRemaining)}s`, '');
         animationId = requestAnimationFrame(animationLoop);
         return;
@@ -1099,9 +1481,12 @@ function animationLoop(timestamp) {
     const pts = waypoints;
     const pos = getPositionAtDistance(pts, traveledDistanceKm);
     movingMarker.setLatLng(pos);
+    updateMap3dMarker(pos);
     if (followMode) map.panTo(pos, { animate: false });
+    if (followMode && map3d) map3d.jumpTo({ center: [pos.lng, pos.lat] });
 
     updateBatteryDrain();
+    syncMap3dDrain();
 
     // Check 112 alarms
     if (chk112.checked) {
@@ -1178,6 +1563,7 @@ function animationLoop(timestamp) {
     if (traveledDistanceKm >= totalDistanceKm) {
         const finalPos = waypoints[waypoints.length - 1];
         movingMarker.setLatLng(finalPos);
+        updateMap3dMarker(finalPos);
         traveledDistanceKm = totalDistanceKm;
         isAtEnd = true;
         infoCurrentSpeed.textContent = '0 ' + speedUnit();
@@ -1213,17 +1599,50 @@ function updateBatteryDrain() {
     const drainOn = chkDrain && chkDrain.checked;
 
     if (!drainOn) {
-        clearDrainLayers();
+        if (batteryDrainLine) { map.removeLayer(batteryDrainLine); batteryDrainLine = null; }
+        _drainStopDots.forEach(d => map.removeLayer(d));
+        syncMap3dDrain();
         batteryDrainActive = false;
+        _drainStopActive = false;
+        return;
     }
 
-    if (_drainEnded) {
-        if (drainOn && !batteryDrainActive) {
-            batteryDrainActive = true;
-            refreshDrainPath();
+    if (!batteryDrainActive) {
+        batteryDrainActive = true;
+        _drainLastUpdateDist = traveledDistanceKm;
+        refreshDrainPath();
+        _drainStopDots.forEach(d => d.addTo(map));
+        if (activeStopIndex >= 0 && _drainStopDots.length > 0) {
+            const lp = _drainStopDots[_drainStopDots.length - 1].getLatLng();
+            if (lp.distanceTo(movingMarker.getLatLng()) < 1) _drainStopActive = true;
+        }
+    }
+
+    if (activeStopIndex >= 0) {
+        if (!_drainStopActive) {
+            const st = getStartDateTime();
+            if (st) {
+                const now = new Date(st.getTime() + simElapsedSeconds * 1000);
+                const nowMins = now.getHours() * 60 + now.getMinutes();
+                const dt = drainTimes();
+                if (nowMins >= dt.start && nowMins <= dt.end) {
+                    _drainStopActive = true;
+                    const pos = movingMarker.getLatLng();
+                    const dot = L.circle(pos, {
+                        radius: 10, color: 'transparent', weight: 0,
+                        fillColor: '#e91e63', fillOpacity: 0.35,
+                        interactive: false, renderer: drainRenderer,
+                    }).addTo(map);
+                    _drainStopDots.push(dot);
+                }
+            }
         }
         return;
     }
+
+    _drainStopActive = false;
+
+    if (_drainEnded) return;
 
     const st = getStartDateTime();
     if (!st) return;
@@ -1276,35 +1695,11 @@ function updateBatteryDrain() {
             _drainStartDist = traveledDistanceKm;
         }
     }
-    if (drainOn) {
-        if (!batteryDrainActive) {
-            batteryDrainActive = true;
-            _drainStopActive = false;
-            _drainLastUpdateDist = traveledDistanceKm;
-            refreshDrainPath();
-        }
 
-        if (activeStopIndex >= 0) {
-            if (!_drainStopActive) {
-                _drainStopActive = true;
-                const pos = movingMarker.getLatLng();
-                const dot = L.circle(pos, {
-                    radius: 10, color: 'transparent', weight: 0,
-                    fillColor: '#e91e63', fillOpacity: 0.35,
-                    interactive: false, renderer: drainRenderer,
-                }).addTo(map);
-                _drainStopDots.push(dot);
-            }
-            return;
-        }
+    if (traveledDistanceKm - _drainLastUpdateDist < 0.005) return;
 
-        _drainStopActive = false;
-
-        if (traveledDistanceKm - _drainLastUpdateDist < 0.005) return;
-
-        _drainLastUpdateDist = traveledDistanceKm;
-        refreshDrainPath();
-    }
+    _drainLastUpdateDist = traveledDistanceKm;
+    refreshDrainPath();
 }
 
 function refreshDrainPath() {
@@ -1422,6 +1817,11 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
         document.querySelectorAll('.tab-content').forEach(t => t.style.display = 'none');
         btn.classList.add('active');
         document.getElementById('tab' + btn.dataset.tab.charAt(0).toUpperCase() + btn.dataset.tab.slice(1)).style.display = 'flex';
+        document.getElementById('btn3D').style.display = btn.dataset.tab === 'nav' ? '' : 'none';
+        if (btn.dataset.tab === 'route' && document.getElementById('btn3D').classList.contains('active')) {
+            document.getElementById('btn3D').classList.remove('active');
+            toggleMap3D();
+        }
     });
 });
 
@@ -1727,7 +2127,7 @@ try {
     }
 } catch {}
 
-console.log('Trail Animator ready — click the map to start!');
+
 
 // ============================================================
 //   Sun view — horizon schematic with sun position

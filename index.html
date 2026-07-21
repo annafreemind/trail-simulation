@@ -4,6 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Trail Simulation</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><path d='M2 26 L10 12 L16 18 L22 8 L30 26Z' fill='%234a7cf7'/><circle cx='16' cy='18' r='3' fill='%23e74c3c'/><circle cx='10' cy='12' r='1.5' fill='%2327ae60'/><circle cx='22' cy='8' r='1.5' fill='%2327ae60'/></svg>"/>
     <link
         rel="stylesheet"
         href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
@@ -15,6 +16,8 @@
         integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
         crossorigin=""
     ></script>
+    <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.css" />
+    <script src="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>
     <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -33,11 +36,12 @@
             </div>
 
             <div style="display:flex;flex-direction:column;gap:8px">
-            <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#8899bb;cursor:pointer;padding:1px 0">
+            <div style="display:grid;grid-template-columns:1fr auto;align-items:center;gap:2px 8px">
+            <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:#8899bb;cursor:pointer;padding:1px 0;width:fit-content;grid-row:1;grid-column:1">
                 <input type="checkbox" id="chkLabels" checked style="accent-color:#4a7cf7;width:14px;height:14px;cursor:pointer" />
                 Show point labels on map
             </label>
-            <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:#8899bb;padding:1px 0">
+            <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:#8899bb;grid-row:2;grid-column:1">
                 <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
                     <input type="checkbox" id="chkPoi" checked style="accent-color:#4a7cf7;width:14px;height:14px;cursor:pointer" />
                     POI
@@ -47,6 +51,9 @@
                     <span class="toggle-slider"></span>
                     <span style="color:#8899bb;font-size:10px">POI labels</span>
                 </label>
+            </div>
+            <button id="btn3D" class="btn-3d-toggle" style="grid-row:1 / span 2;grid-column:2;display:none" title="3D Terrain View">3D</button>
+            <button id="btn3D" class="btn-3d-toggle" style="grid-row:1 / span 2;grid-column:2;display:none" title="3D Terrain View">3D</button>
             </div>
             <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:#8899bb;padding:1px 0 4px">
                 <span style="flex-shrink:0">Map:</span>
@@ -142,7 +149,6 @@
                         <span style="display:inline-flex;align-items:center;gap:4px"><input type="number" id="speed" value="1.7" min="0.1" step="0.1" style="width:72px" /> <select id="speedUnit" style="background:#0f1a30;border:1px solid #2a3a5e;border-radius:4px;padding:7px 2px;color:#f0f4ff;font-size:12px;outline:none"><option value="kmh">km/h</option><option value="mph">mph</option></select></span>
                     </div>
                 </div>
-
                 <div class="ctrl-group" style="margin:5px 0;gap:8px">
                     <label for="timeScale">Time acceleration: <span id="timeScaleLabel">150</span>×</label>
                     <input type="range" id="timeScale" min="1" max="300" step="0.1" value="150" />
@@ -228,6 +234,7 @@
 
         <!-- Map -->
         <div id="map"></div>
+        <div id="map3d" style="display:none"></div>
         <div class="sun-controls">
            <canvas id="sunView" width="400" height="300"></canvas>
            <div class="sun-caption">
