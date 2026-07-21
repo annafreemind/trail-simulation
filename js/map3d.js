@@ -98,6 +98,10 @@ export function initMap3D() {
             addMap3dMarker();
             updateMap3dMarker(state.movingMarker.getLatLng());
         }
+
+        const canvas = state.map3d.getCanvas();
+        canvas.addEventListener('mousedown', () => { state._map3dMouseDown = true; });
+        document.addEventListener('mouseup', () => { state._map3dMouseDown = false; });
     });
 }
 

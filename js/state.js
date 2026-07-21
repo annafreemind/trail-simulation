@@ -70,5 +70,6 @@ export const state = {
     _map3dSpeedLabels: [],
     _map3dCustomLabels: [],
     _map3d112Labels: [],
+    _map3dMouseDown: false,
     _alarmTimeouts: [],
 };
