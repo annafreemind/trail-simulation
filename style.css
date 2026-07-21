@@ -171,35 +171,40 @@ input:disabled, select:disabled {
 }
 
 .btn-3d-toggle {
-    padding: 6px 24px;
-    background: rgba(74, 124, 247, 0.1);
-    border: 1px solid #3a5a9e;
-    border-radius: 5px;
-    color: #aabbdd;
-    font-size: 12px;
+    padding: 8px 18px;
+    background: linear-gradient(135deg, rgba(74, 124, 247, 0.12), rgba(120, 80, 220, 0.12));
+    border: 1px solid rgba(74, 124, 247, 0.25);
+    border-radius: 8px;
+    color: #8aacf7;
+    font-size: 13px;
     font-weight: 700;
+    letter-spacing: 1px;
     cursor: pointer;
-    transition: all .2s;
+    transition: all .25s cubic-bezier(.4, 0, .2, 1);
     white-space: nowrap;
     height: 100%;
 }
 .btn-3d-toggle:hover:not(:disabled) {
-    border-color: #4a7cf7;
-    color: #fff;
-    background: rgba(74, 124, 247, 0.2);
+    border-color: rgba(74, 124, 247, 0.5);
+    color: #c0d4ff;
+    background: linear-gradient(135deg, rgba(74, 124, 247, 0.2), rgba(120, 80, 220, 0.2));
+    transform: translateY(-1px);
 }
 .btn-3d-toggle.active {
-    background: #4a7cf7;
+    background: linear-gradient(135deg, #4a7cf7, #6b4fd4);
     color: #fff;
-    border-color: #4a7cf7;
-    box-shadow: 0 0 10px rgba(74, 124, 247, 0.25);
+    border-color: transparent;
+    box-shadow: 0 0 8px rgba(74, 124, 247, 0.2), inset 0 1px 0 rgba(255, 255, 255, .12);
 }
 .btn-3d-toggle.active:hover:not(:disabled) {
-    background: #5a8cf7;
+    background: linear-gradient(135deg, #5a8cf7, #7b5fe4);
+    box-shadow: 0 0 12px rgba(74, 124, 247, 0.25), inset 0 1px 0 rgba(255, 255, 255, .15);
+    transform: none;
 }
 .btn-3d-toggle:disabled {
-    opacity: 0.4;
+    opacity: 0.35;
     cursor: not-allowed;
+    transform: none;
 }
 
 .tab-btn {

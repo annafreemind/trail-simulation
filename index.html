@@ -36,13 +36,13 @@
             </div>
 
             <div style="display:flex;flex-direction:column;gap:8px">
-            <div style="display:grid;grid-template-columns:1fr auto;align-items:center;gap:2px 8px">
+            <div style="display:grid;grid-template-columns:1fr auto;align-items:center;gap:6px 8px">
             <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:#8899bb;cursor:pointer;padding:1px 0;width:fit-content;grid-row:1;grid-column:1">
                 <input type="checkbox" id="chkLabels" checked style="accent-color:#4a7cf7;width:14px;height:14px;cursor:pointer" />
                 Show point labels on map
             </label>
             <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:#8899bb;grid-row:2;grid-column:1">
-                <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+                    <label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer">
                     <input type="checkbox" id="chkPoi" checked style="accent-color:#4a7cf7;width:14px;height:14px;cursor:pointer" />
                     POI
                 </label>
@@ -52,8 +52,7 @@
                     <span style="color:#8899bb;font-size:10px">POI labels</span>
                 </label>
             </div>
-            <button id="btn3D" class="btn-3d-toggle" style="grid-row:1 / span 2;grid-column:2;display:none" title="3D Terrain View">3D</button>
-            <button id="btn3D" class="btn-3d-toggle" style="grid-row:1 / span 2;grid-column:2;display:none" title="3D Terrain View">3D</button>
+            <button id="btn3D" class="btn-3d-toggle" style="grid-row:1 / span 2;grid-column:2;display:none">3D</button>
             </div>
             <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:#8899bb;padding:1px 0 4px">
                 <span style="flex-shrink:0">Map:</span>
@@ -159,26 +158,26 @@
                     <button class="btn btn-warning" id="btnPause" disabled>Pause</button>
                     <button class="btn btn-danger" id="btnStop" disabled>Stop</button>
                 </div>
-                <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#aabbdd;cursor:pointer;padding:1px 0">
+                <div style="display:flex;align-items:center;gap:6px;padding:1px 0">
                     <input type="checkbox" id="chkFollow" checked style="accent-color:#4a7cf7;width:14px;height:14px;cursor:pointer" />
-                    Follow mode
-                </label>
-                <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#aabbdd;cursor:pointer;padding:1px 0">
+                    <label for="chkFollow" style="font-size:12px;color:#aabbdd;cursor:pointer">Follow mode</label>
+                </div>
+                <div style="display:flex;align-items:center;gap:6px;padding:1px 0">
                     <input type="checkbox" id="chkUphill" checked style="accent-color:#4a7cf7;width:14px;height:14px;cursor:pointer" />
-                    Uphill auto-slowdown
+                    <label for="chkUphill" style="font-size:12px;color:#aabbdd;cursor:pointer">Uphill auto-slowdown</label>
                     <span class="help-icon" tabindex="0">?
                         <span class="tooltip-text">When climbing uphill, speed decreases proportionally to slope steepness. At 14° or more — down to 50% of base speed.</span>
                     </span>
-                </label>
-                <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#aabbdd;cursor:pointer;padding:1px 0">
+                </div>
+                <div style="display:flex;align-items:center;gap:6px;padding:1px 0">
                     <input type="checkbox" id="chk112" checked style="accent-color:#4a7cf7;width:14px;height:14px;cursor:pointer" />
-                    112 call notifications
-                </label>
-                <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#aabbdd;cursor:pointer;padding:1px 0">
+                    <label for="chk112" style="font-size:12px;color:#aabbdd;cursor:pointer">112 call notifications</label>
+                </div>
+                <div style="display:flex;align-items:center;gap:6px;padding:1px 0">
                     <input type="checkbox" id="chkDrain" style="accent-color:#4a7cf7;width:14px;height:14px;cursor:pointer" />
-                    Battery drain overlay
+                    <label for="chkDrain" style="font-size:12px;color:#aabbdd;cursor:pointer">Battery drain overlay</label>
                     <span id="drainTimeLabel" style="font-size:10px;color:#8899bb;display:none"></span>
-                </label>
+                </div>
                 <div id="drainCustomFields" style="display:none;padding:0 0 0 20px;font-size:10px;color:#8899bb">
                     <div style="display:flex;align-items:center;gap:1px;padding:1px 0">
                         <span id="drainStartHVal" style="width:22px;text-align:center;color:#f0f4ff;font-size:11px">14</span>
@@ -270,6 +269,6 @@
     <script src="elevation_grid.js"></script>
     <script src="photos.js"></script>
     <script src="pois.js"></script>
-    <script src="app.js"></script>
+    <script type="module" src="js/main.js"></script>
 </body>
 </html>
