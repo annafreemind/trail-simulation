@@ -6,6 +6,7 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
+    <meta name="app-version" content="4" />
     <title>Trail Simulation</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><path d='M2 26 L10 12 L16 18 L22 8 L30 26Z' fill='%234a7cf7'/><circle cx='16' cy='18' r='3' fill='%23e74c3c'/><circle cx='10' cy='12' r='1.5' fill='%2327ae60'/><circle cx='22' cy='8' r='1.5' fill='%2327ae60'/></svg>"/>
     <link
@@ -32,6 +33,18 @@
                 <span>Trail Simulation<small>draw route · animate movement</small></span>
                 <button id="btnHelp" title="Help" style="width:26px;height:26px;background:transparent;border:1px solid #2a3a5e;border-radius:50%;color:#8899bb;font-size:14px;font-weight:700;cursor:pointer;flex-shrink:0;line-height:1">?</button>
             </h1>
+
+            <div id="updateBanner" class="update-banner">
+                <span class="update-banner-text">
+                    <strong>Update!</strong> To get the latest changes, please refresh with cache clearing:<br>
+                    <span class="update-banner-shortcuts">
+                        <span><kbd>Ctrl+F5</kbd> (Windows)</span>
+                        <span><kbd>Ctrl+Shift+R</kbd> (Linux)</span>
+                        <span><kbd>Cmd+Shift+R</kbd> (macOS)</span>
+                    </span>
+                </span>
+                <button id="updateBannerClose" class="update-banner-close">&times;</button>
+            </div>
 
             <div style="display:flex;gap:4px;align-items:center;margin-bottom:6px">
                 <button class="tab-btn active" data-tab="route" style="flex:1">Route</button>
