@@ -397,6 +397,16 @@ export function initStorage() {
             document.getElementById('mapLayer').value = saved.mapLayer;
             document.getElementById('mapLayer').dispatchEvent(new Event('change'));
         }
+        if (saved && saved.sunCollapsed) {
+            const sunCtl = document.querySelector('.sun-controls');
+            sunCtl.classList.add('collapsed');
+            document.getElementById('sunViewToggle').textContent = '\u25B2';
+        }
+        if (saved && saved.elevCollapsed) {
+            const elevCtl = document.querySelector('.elev-controls');
+            elevCtl.classList.add('collapsed');
+            document.getElementById('elevViewToggle').textContent = '\u25B2';
+        }
     } catch {}
 }
 

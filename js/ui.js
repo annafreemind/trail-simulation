@@ -1,7 +1,7 @@
 import { state } from './state.js';
 import {
     elStartTime, elSpeed, elSpeedUnit, elTimeScale, elTimeScaleLabel,
-    btnStart, btnPause, btnStop, btnClear, btnUndo,
+    btnStart, btnPause, btnStop, btnClear, btnUndo, btnFit,
     infoCurrentSpeed, infoTimer,
     chkFollow, chkLabels, chkPoi, chkPoiLabels, chkUphill, chk112, chkDrain,
     btn3D,
@@ -41,6 +41,8 @@ function saveSettings() {
         drainStart: drainGet('startH') + ':' + String(drainGet('startM')).padStart(2, '0'),
         drainEnd: drainGet('endH') + ':' + String(drainGet('endM')).padStart(2, '0'),
         timeScale: elTimeScale.value,
+        sunCollapsed: document.querySelector('.sun-controls').classList.contains('collapsed'),
+        elevCollapsed: document.querySelector('.elev-controls').classList.contains('collapsed'),
     }));
 }
 
@@ -591,6 +593,14 @@ export function initUI() {
         drawElevProfile();
     });
 
+    btnFit.addEventListener('click', () => {
+        if (state.waypoints.length >= 2) {
+            map.fitBounds(L.latLngBounds(state.waypoints), { padding: [50, 50] });
+        } else {
+            map.setView(state.CENTER, state.ZOOM);
+        }
+    });
+
     chkFollow.addEventListener('change', () => {
         state.followMode = chkFollow.checked;
         setStatus(state.followMode ? 'Follow mode on' : 'Follow mode off', '');
@@ -662,6 +672,10 @@ export function initUI() {
                 btn3D.classList.remove('active');
                 toggleMap3D();
             }
+            if (btn.dataset.tab === 'nav' && localStorage.getItem('trail_3d_active') === 'true' && !btn3D.classList.contains('active')) {
+                btn3D.classList.add('active');
+                toggleMap3D();
+            }
         });
     });
 
@@ -720,12 +734,14 @@ export function initUI() {
         const container = document.querySelector('.sun-controls');
         container.classList.toggle('collapsed');
         this.textContent = container.classList.contains('collapsed') ? '\u25B2' : '\u25BC';
+        saveSettings();
     });
 
     document.getElementById('elevViewToggle').addEventListener('click', function () {
         const container = document.querySelector('.elev-controls');
         container.classList.toggle('collapsed');
         this.textContent = container.classList.contains('collapsed') ? '\u25B2' : '\u25BC';
+        saveSettings();
     });
 
     document.getElementById('btnHelp').addEventListener('click', async () => {

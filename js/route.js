@@ -2,6 +2,7 @@ import { state } from './state.js';
 import { infoPoints, infoDistance } from './dom.js';
 import { haversineKm, pathLength, formatDistance } from './helpers.js';
 import { syncMap3dRoute } from './map3d.js';
+import { routeRenderer } from './map.js';
 
 let _mapRef = null;
 export function setRouteMap(map) { _mapRef = map; }
@@ -60,7 +61,7 @@ export function redrawPath() {
     if (state.waypoints.length >= 2) {
         state.polyline = L.polyline(state.waypoints, {
             color: '#4a7cf7', weight: 4, opacity: 0.85, dashArray: null,
-            renderer: L.svg({ pane: 'route' }),
+            renderer: routeRenderer,
         }).addTo(_mapRef);
     }
 

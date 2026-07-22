@@ -12,6 +12,7 @@ import { renderScheduledStops, renderSpeedPoints, renderCustomPoints } from './p
 import { initMap3D, toggleMap3D, syncMap3dStaticLayers, syncMap3dDrain } from './map3d.js';
 import { TILE_URLS_3D as TILES3D } from './map3d.js';
 import { updateBatteryDrain } from './drain.js';
+import { drawElevProfile, updateStartButton } from './ui.js';
 
 const map = L.map('map', {
     center: [8.836955, -82.423918],
@@ -123,6 +124,8 @@ function onMapClick(e) {
     updateInfo();
     setStatus(`Waypoint ${state.waypoints.length} added`, '');
     buildElevationData();
+    drawElevProfile();
+    updateStartButton();
 }
 
 const poiIcons = L.layerGroup().addTo(map);
@@ -186,6 +189,7 @@ function initMap() {
     btn3D.addEventListener('click', function () {
         this.classList.toggle('active');
         toggleMap3D();
+        localStorage.setItem('trail_3d_active', this.classList.contains('active'));
     });
 
     if (!chkPoi.checked) {
