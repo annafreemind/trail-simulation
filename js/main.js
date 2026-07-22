@@ -41,8 +41,6 @@ btnPause.addEventListener('click', () => {
         btnPause.textContent = 'Pause';
         setDrainVisibility(false);
         state.lastFrameTimestamp = performance.now();
-        const val = parseFloat(elSpeed.value) || 0;
-        state._currentSpeedKmh = elSpeedUnit.value === 'mph' ? val / 0.621371 : val;
         infoCurrentSpeed.textContent = formatSpeed(getSpeedKmh());
         setStatus('Movement resumed', 'active');
         state.animationId = requestAnimationFrame(animationLoop);
