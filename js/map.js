@@ -51,11 +51,13 @@ topoLayer.on('tileerror', (e) => {
 
 const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
     maxZoom: 19,
+    maxNativeZoom: 18,
     attribution: '&copy; Esri, Maxar, Earthstar Geographics, and the GIS User Community',
 });
 
 const wayback2014Layer = L.tileLayer('https://wayback.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/WMTS/1.0.0/default028mm/MapServer/tile/10/{z}/{y}/{x}', {
     maxZoom: 19,
+    maxNativeZoom: 17,
     attribution: '&copy; Esri, ArcGIS, World Imagery Wayback 2014',
 });
 
