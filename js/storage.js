@@ -1,7 +1,7 @@
 import { state } from './state.js';
 import {
     elStartTime, elSpeed, elSpeedUnit, elTimeScale, elTimeScaleLabel,
-    chkFollow, chkLabels, chkPoi, chkPoiLabels, chkUphill, chk112, chkDrain,
+    chkFollow, chkLabels, chkPoi, chkPoiLabels, chkTerrain, chk112, chkDrain,
 } from './dom.js';
 import {
     redrawPath, updateInfo, buildElevationData,
@@ -207,7 +207,7 @@ export function initStorage() {
                 chkPoi: chkPoi.checked,
                 chkPoiLabels: chkPoiLabels.checked,
                 chkFollow: chkFollow.checked,
-                chkUphill: chkUphill.checked,
+                chkTerrain: chkTerrain.checked,
                 chk112: chk112.checked,
                 chkDrain: chkDrain.checked,
                 drainStart: drainGet('startH') + ':' + String(drainGet('startM')).padStart(2, '0'),
@@ -287,8 +287,11 @@ export function initStorage() {
                         chkFollow.checked = s.chkFollow;
                         state.followMode = s.chkFollow;
                     }
-                    if (s.chkUphill !== undefined) {
-                        chkUphill.checked = s.chkUphill;
+                    if (s.chkTerrain !== undefined) {
+                        chkTerrain.checked = s.chkTerrain;
+                    }
+                    if (s.chkUphill !== undefined && s.chkTerrain === undefined) {
+                        chkTerrain.checked = s.chkUphill;
                     }
                     if (s.chk112 !== undefined) {
                         chk112.checked = s.chk112;
@@ -350,8 +353,11 @@ export function initStorage() {
             chkFollow.checked = saved.chkFollow;
             state.followMode = saved.chkFollow;
         }
-        if (saved && saved.chkUphill !== undefined) {
-            chkUphill.checked = saved.chkUphill;
+        if (saved && saved.chkTerrain !== undefined) {
+            chkTerrain.checked = saved.chkTerrain;
+        }
+        if (saved && saved.chkUphill !== undefined && saved.chkTerrain === undefined) {
+            chkTerrain.checked = saved.chkUphill;
         }
         if (saved && saved.chk112 !== undefined) {
             chk112.checked = saved.chk112;

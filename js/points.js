@@ -61,7 +61,7 @@ export function renderScheduledStops() {
             zIndexOffset: 600,
         }).addTo(_mapRef);
         if (chkLabels.checked) {
-            m.bindTooltip(`${s.label} (${formatStopDuration(s.duration)})`, { permanent: true, direction: 'top', offset: [0, -4] });
+            m.bindTooltip(`${s.label} (${formatStopDuration(s.duration)})`, { permanent: true, direction: 'top', offset: [0, -4], className: 'point-label point-label-stop' });
         }
         state.scheduledStopMarkers.push(m);
     });
@@ -83,7 +83,7 @@ export function renderSpeedPoints() {
             zIndexOffset: 600,
         }).addTo(_mapRef);
         if (chkLabels.checked) {
-            m.bindTooltip(`${s.label} (${formatSpeed(s.speed)})`, { permanent: true, direction: 'top', offset: [0, -4] });
+            m.bindTooltip(`${s.label} (${formatSpeed(s.speed)})`, { permanent: true, direction: 'top', offset: [0, -4], className: 'point-label point-label-speed' });
         }
         state.speedPointMarkers.push(m);
     });
@@ -105,7 +105,7 @@ export function renderCustomPoints() {
             zIndexOffset: 600,
         }).addTo(_mapRef);
         if (chkLabels.checked) {
-            m.bindTooltip(s.label, { permanent: true, direction: 'top', offset: [0, -4] });
+            m.bindTooltip(s.label, { permanent: true, direction: 'top', offset: [0, -4], className: 'point-label point-label-custom' });
         }
         state.customPointMarkers.push(m);
     });
@@ -126,7 +126,7 @@ export function render112Points() {
             zIndexOffset: 900,
         }).addTo(_mapRef);
         if (chkLabels.checked) {
-            m.bindTooltip(p.label, { permanent: true, direction: 'top', offset: [0, -6] });
+            m.bindTooltip(p.label, { permanent: true, direction: 'top', offset: [0, -6], className: 'point-label point-label-112' });
         }
         state._112PointMarkers.push(m);
     });

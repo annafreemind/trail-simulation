@@ -3,7 +3,7 @@ import {
     elStartTime, elSpeed, elSpeedUnit, elTimeScale, elTimeScaleLabel,
     btnStart, btnPause, btnStop, btnClear, btnUndo, btnFit,
     infoCurrentSpeed, infoTimer,
-    chkFollow, chkLabels, chkPoi, chkPoiLabels, chkUphill, chk112, chkDrain,
+    chkFollow, chkLabels, chkPoi, chkPoiLabels, chkTerrain, chk112, chkDrain,
     btn3D,
     sunCanvas, sunCtx, elevCanvas, elevCtx,
 } from './dom.js';
@@ -35,7 +35,7 @@ function saveSettings() {
         chkPoi: chkPoi.checked,
         chkPoiLabels: chkPoiLabels.checked,
         chkFollow: chkFollow.checked,
-        chkUphill: chkUphill.checked,
+        chkTerrain: chkTerrain.checked,
         chk112: chk112.checked,
         chkDrain: chkDrain.checked,
         drainStart: drainGet('startH') + ':' + String(drainGet('startM')).padStart(2, '0'),
@@ -640,7 +640,7 @@ export function initUI() {
         saveSettings();
     });
 
-    chkUphill.addEventListener('change', saveSettings);
+    chkTerrain.addEventListener('change', saveSettings);
 
     chk112.addEventListener('change', saveSettings);
 

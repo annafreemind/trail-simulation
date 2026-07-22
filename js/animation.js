@@ -1,7 +1,7 @@
 import { state } from './state.js';
 import {
     elStartTime, elSpeed, infoTimer, infoCurrentTime, infoCurrentSpeed,
-    chkFollow, chkUphill, chk112, chkDrain, btnStart, btnPause, btnStop,
+    chkFollow, chkTerrain, chk112, chkDrain, btnStart, btnPause, btnStop,
     elTimeScale, btn3D,
 } from './dom.js';
 import {
@@ -245,12 +245,13 @@ export function animationLoop(timestamp) {
     const speed = getSpeedKmh();
     let effectiveSpeed = speed;
     state._slopeDeg = 0;
-    if (chkUphill.checked) {
+    if (chkTerrain.checked) {
         if (state.routeElevationData.length >= 2) {
             state._slopeDeg = computeSlope(state.traveledDistanceKm, state.totalDistanceKm);
-            if (state._slopeDeg > 0) {
-                effectiveSpeed = speed * Math.max(0.5, 1 - state._slopeDeg / 28);
-            }
+            const slopeRad = state._slopeDeg * Math.PI / 180;
+            const tanSlope = Math.tan(slopeRad);
+            const ratio = Math.exp(-3.5 * (Math.abs(tanSlope + 0.05) - 0.05));
+            effectiveSpeed = speed * ratio;
         }
     }
     const speedKmPerSec = effectiveSpeed / 3600;
@@ -356,8 +357,10 @@ export function animationLoop(timestamp) {
     }
 
     if (!state.isAtEnd) {
-        if (state._slopeDeg > 0) {
-            infoCurrentSpeed.textContent = formatSpeed(effectiveSpeed) + '  \u2191' + state._slopeDeg.toFixed(0) + '\u00b0';
+        if (Math.abs(state._slopeDeg) > 0.5) {
+            const arrow = state._slopeDeg > 0 ? '\u2191' : '\u2193';
+            const boost = effectiveSpeed > speed ? ' \u26A1' : '';
+            infoCurrentSpeed.textContent = formatSpeed(effectiveSpeed) + '  ' + arrow + Math.abs(state._slopeDeg).toFixed(0) + '\u00b0' + boost;
         } else {
             infoCurrentSpeed.textContent = formatSpeed(getSpeedKmh());
         }

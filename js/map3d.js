@@ -148,7 +148,7 @@ export function syncMap3dStops() {
         state.scheduledStops.forEach(s => {
             const el = document.createElement('div');
             el.className = 'map3d-marker-label';
-            el.innerHTML = `<span class="map3d-label-text">${s.label} (${formatStopDuration(s.duration)})</span>`;
+            el.innerHTML = `<span class="point-label point-label-stop">${s.label} (${formatStopDuration(s.duration)})</span>`;
             const marker = new maplibregl.Marker({ element: el, anchor: 'bottom', offset: [0, -10] }).setLngLat([s.latlng.lng, s.latlng.lat]).addTo(state.map3d);
             state._map3dStopLabels.push(marker);
         });
@@ -165,7 +165,7 @@ export function syncMap3dSpeeds() {
         state.speedPoints.forEach(s => {
             const el = document.createElement('div');
             el.className = 'map3d-marker-label';
-            el.innerHTML = `<span class="map3d-label-text">${s.label} (${formatSpeed(s.speed)})</span>`;
+            el.innerHTML = `<span class="point-label point-label-speed">${s.label} (${formatSpeed(s.speed)})</span>`;
             const marker = new maplibregl.Marker({ element: el, anchor: 'bottom', offset: [0, -10] }).setLngLat([s.latlng.lng, s.latlng.lat]).addTo(state.map3d);
             state._map3dSpeedLabels.push(marker);
         });
@@ -182,7 +182,7 @@ export function syncMap3dCustoms() {
         state.customPoints.forEach(s => {
             const el = document.createElement('div');
             el.className = 'map3d-marker-label';
-            el.innerHTML = `<span class="map3d-label-text">${s.label}</span>`;
+            el.innerHTML = `<span class="point-label point-label-custom">${s.label}</span>`;
             const marker = new maplibregl.Marker({ element: el, anchor: 'bottom', offset: [0, -10] }).setLngLat([s.latlng.lng, s.latlng.lat]).addTo(state.map3d);
             state._map3dCustomLabels.push(marker);
         });
@@ -270,7 +270,7 @@ export function syncMap3d112() {
         state._112Points.forEach(p => {
             const el = document.createElement('div');
             el.className = 'map3d-marker-label';
-            el.innerHTML = `<span class="map3d-label-text">${p.label}</span>`;
+            el.innerHTML = `<span class="point-label point-label-112">${p.label}</span>`;
             const marker = new maplibregl.Marker({ element: el, anchor: 'bottom', offset: [0, -10] }).setLngLat([p.latlng.lng, p.latlng.lat]).addTo(state.map3d);
             state._map3d112Labels.push(marker);
         });

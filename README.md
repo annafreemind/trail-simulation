@@ -11,7 +11,7 @@ Built with [Leaflet](https://leafletjs.com).
 - **Stop points** — place timed stops anywhere on the route; the marker pauses automatically and resumes after the countdown
 - **Speed points** — change speed mid-route at specific waypoints
 - **Custom points** — place labeled purple markers anywhere on the map (not tracked during animation, useful for landmarks)
-- **Uphill auto-slowdown** — speed decreases proportionally on uphill sections (up to 50% at 14° slope or steeper); slope is computed from elevation data
+- **Terrain auto-slowdown** — speed adjusts to terrain steepness using Tobler's hiking function (slight downhill speed boost on gentle slopes, gradual slowdown on steep climbs and descents)
 - **Sun widget** — first-person sky view with compass rose, heading arrow, sun position, and realistic sky colors; full-day sun trajectory on compass and sky; sun icon moves across the sky from sunrise to sunset; compass path shows how the sun arcs through the day
 - **Elevation profile** — route elevation chart sampled every 30 meters (matches SRTM source resolution); auto-switches between metric and imperial units; smooth profile line with moving-average filtering
 - **112 alarms** — two call notifications at 16:39 and 16:51 with red markers on the route and a fading banner
@@ -95,26 +95,29 @@ During animation you will see:
 - The moving marker traveling along the route
 - The **Timer** counting elapsed real time
 - The **Current time** showing simulated clock time
-- The **Current speed** — shows the effective speed including uphill slowdown if enabled (e.g. `1.2 km/h ↑8°`)
+- The **Current speed** — shows the effective speed including terrain slowdown if enabled (e.g. `1.2 km/h ↑8°` or `5.3 km/h ↓3° ⚡`)
 - Stops pausing the marker with a countdown
 - Speed points updating the current speed when reached
 
-### Uphill auto-slowdown
+### Terrain auto-slowdown
 
-When enabled (checked by default in the Navigation tab), the simulation detects uphill slopes and reduces speed proportionally:
+When enabled (checked by default in the Navigation tab), the simulation uses Tobler's hiking function to adjust speed based on terrain steepness:
 
-| Slope | Speed reduction |
-|-------|----------------|
-| 0°    | 100% (no change) |
-| 7°    | ~75% of base speed |
-| 14°   | 50% of base speed |
-| 14°+  | 50% (minimum, clamped) |
+| Slope | Uphill | Downhill |
+|-------|--------|----------|
+| 0°    | 100%  | 100%     |
+| 2°    | 89%   | **113%** ⚡ |
+| 5°    | 74%   | 105% ⚡  |
+| 8°    | 60%   | 87%      |
+| 10°   | 52%   | 77%      |
+| 12°   | 44%   | 67%      |
+| 14°   | 37%   | 58%      |
+| 16°   | 31%   | 50%      |
+| 20°   | 22%   | 37%      |
 
-The formula: `effective = base × max(0.5, 1 − slope°/28)`
+The formula (Tobler, 1993): `ratio = exp(-3.5 × (|tan(slope) + 0.05| − 0.05))`
 
-Slope is computed from elevation data sourced from the SRTM1 digital elevation model (NASA, 30 m resolution) pre-packaged as a local grid for the Boquete area. No API calls are needed — elevation lookups are instantaneous.
-
-Hover over the **`?`** icon next to the checkbox for a quick summary.
+Gentle downhill (up to ~6°) gets a slight speed boost; steep slopes in either direction gradually slow the hiker down. Speed display shows `↑` for uphill, `↓` for downhill, and `⚡` for downhill speed boost.
 
 ### 112 call notifications
 
