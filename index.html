@@ -34,18 +34,6 @@
                 <button id="btnHelp" title="Help" style="width:26px;height:26px;background:transparent;border:1px solid #2a3a5e;border-radius:50%;color:#8899bb;font-size:14px;font-weight:700;cursor:pointer;flex-shrink:0;line-height:1">?</button>
             </h1>
 
-            <div id="updateBanner" class="update-banner">
-                <span class="update-banner-text">
-                    <strong>Update!</strong> To get the latest changes, please refresh with cache clearing:<br>
-                    <span class="update-banner-shortcuts">
-                        <span><kbd>Ctrl+F5</kbd> (Windows)</span>
-                        <span><kbd>Ctrl+Shift+R</kbd> (Linux)</span>
-                        <span><kbd>Cmd+Shift+R</kbd> (macOS)</span>
-                    </span>
-                </span>
-                <button id="updateBannerClose" class="update-banner-close">&times;</button>
-            </div>
-
             <div style="display:flex;gap:4px;align-items:center;margin-bottom:6px">
                 <button class="tab-btn active" data-tab="route" style="flex:1">Route</button>
                 <button class="tab-btn" data-tab="nav" style="flex:1">Navigation</button>
@@ -248,8 +236,16 @@
         </div>
 
         <!-- Map -->
-        <div id="map"></div>
-        <div id="map3d" style="display:none"></div>
+        <div id="map">
+            <div class="update-bar">
+                <span>To get the latest changes: <kbd>Ctrl+F5</kbd> (Windows), <kbd>Ctrl+Shift+R</kbd> (Linux), <kbd>Cmd+Shift+R</kbd> (macOS)</span>
+            </div>
+        </div>
+        <div id="map3d" style="display:none">
+            <div class="update-bar">
+                <span>To get the latest changes: <kbd>Ctrl+F5</kbd> (Windows), <kbd>Ctrl+Shift+R</kbd> (Linux), <kbd>Cmd+Shift+R</kbd> (macOS)</span>
+            </div>
+        </div>
         <div class="bottom-widgets">
         <div class="sun-controls">
            <canvas id="sunView" width="400" height="300"></canvas>

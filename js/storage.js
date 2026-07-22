@@ -330,21 +330,6 @@ export function initStorage() {
         this.value = '';
     });
 
-    (function () {
-        const APP_VERSION = document.querySelector('meta[name="app-version"]')?.getAttribute('content');
-        if (!APP_VERSION) return;
-        const banner = document.getElementById('updateBanner');
-        const closeBtn = document.getElementById('updateBannerClose');
-        const lastSeen = localStorage.getItem('trail_last_seen_version');
-        if (lastSeen === APP_VERSION) {
-            banner.style.display = 'none';
-        }
-        closeBtn.addEventListener('click', () => {
-            banner.style.display = 'none';
-            localStorage.setItem('trail_last_seen_version', APP_VERSION);
-        });
-    })();
-
     migrateToDB().then(() => populateRouteList());
 
     try {
