@@ -57,6 +57,7 @@ export function initMap3D() {
         center: [_mapRef.getCenter().lng, _mapRef.getCenter().lat],
         zoom: Math.min(_mapRef.getZoom(), 15),
         pitch: 60,
+        maxPitch: 85,
         localFontFamily: 'Arial, sans-serif',
         style: {
             version: 8,

@@ -21,7 +21,7 @@
     ></script>
     <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.css" />
     <script src="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>
-    <link rel="stylesheet" href="style.css?v=2" />
+    <link rel="stylesheet" href="style.css?v=4" />
 </head>
 <body>
     <div id="app">
@@ -237,6 +237,7 @@
         <!-- Map -->
         <div id="map"></div>
         <div id="map3d" style="display:none"></div>
+        <div class="bottom-widgets">
         <div class="sun-controls">
            <canvas id="sunView" width="400" height="300"></canvas>
            <div class="sun-caption">
@@ -253,6 +254,7 @@
               <div id="elevViewToggle" title="Toggle elevation">▼</div>
             </div>
          </div>
+        </div>
         <div id="alarm" style="display:none;position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:10000;background:#5c1a1a;border:2px solid #e74c3c;border-radius:8px;padding:12px 24px;text-align:center;font-size:18px;font-weight:700;color:#ff6b6b;box-shadow:0 4px 20px rgba(0,0,0,.5);transition:opacity 1s ease">First 112 call</div>
     </div>
 
@@ -267,11 +269,11 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <script src="sun_data.js?v=2"></script>
-    <script src="weather_data.js?v=2"></script>
-    <script src="elevation_grid.js?v=2"></script>
-    <script src="photos.js?v=2"></script>
-    <script src="pois.js?v=2"></script>
-    <script type="module" src="js/main.js?v=2"></script>
+    <script src="sun_data.js?v=4"></script>
+    <script src="weather_data.js?v=4"></script>
+    <script src="elevation_grid.js?v=4"></script>
+    <script src="photos.js?v=4"></script>
+    <script src="pois.js?v=4"></script>
+    <script type="module" src="js/main.js?v=4"></script>
 </body>
 </html>

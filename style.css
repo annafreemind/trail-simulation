@@ -313,6 +313,17 @@ input:disabled, select:disabled {
     line-height: 1;
 }
 
+.bottom-widgets {
+    position: fixed;
+    bottom: 24px;
+    right: 4px;
+    z-index: 10000;
+    display: flex;
+    flex-direction: row-reverse;
+    align-items: flex-end;
+    gap: 6px;
+}
+
 #sunView {
     display: block;
     border-radius: 8px 8px 0 0;
@@ -322,15 +333,12 @@ input:disabled, select:disabled {
 }
 
 .sun-controls {
-    position: fixed;
-    bottom: 24px;
-    right: 4px;
-    z-index: 10000;
     border: 2px solid rgba(255,255,255,0.3);
     border-radius: 8px;
     background: #1a1a2e;
     box-shadow: 0 4px 12px rgba(0,0,0,0.5);
     transition: opacity .3s, transform .3s;
+    flex-shrink: 0;
 }
 
 .sun-controls.collapsed #sunView {
@@ -351,17 +359,21 @@ input:disabled, select:disabled {
     display: none;
 }
 .sun-controls.collapsed #sunViewToggle {
-    width: 26px;
-    height: 26px;
-    font-size: 14px;
+    width: 30px;
+    height: 30px;
+    font-size: 0;
     background: #16213e;
-    border: 2px solid rgba(255,255,255,0.3);
-    border-radius: 6px;
+    border: 2px solid rgba(255,255,255,0.25);
+    border-radius: 8px;
     color: #8899bb;
+}
+.sun-controls.collapsed #sunViewToggle::before {
+    content: '\2600';
+    font-size: 16px;
+    line-height: 1;
 }
 .sun-controls.collapsed #sunViewToggle:hover {
     background: #2a3a5e;
-    color: #f0f4ff;
 }
 
 .sun-caption {
@@ -402,15 +414,12 @@ input:disabled, select:disabled {
 
 /* ===== Elevation widget ===== */
 .elev-controls {
-    position: fixed;
-    bottom: 24px;
-    right: 420px;
-    z-index: 10000;
     border: 2px solid rgba(255,255,255,0.3);
     border-radius: 8px;
     background: #1a1a2e;
     box-shadow: 0 4px 12px rgba(0,0,0,0.5);
     transition: opacity .3s, transform .3s;
+    flex-shrink: 0;
 }
 #elevView {
     display: block;
@@ -439,13 +448,18 @@ input:disabled, select:disabled {
     display: none;
 }
 .elev-controls.collapsed #elevViewToggle {
-    width: 26px;
-    height: 26px;
-    font-size: 14px;
+    width: 30px;
+    height: 30px;
+    font-size: 0;
     background: #16213e;
-    border: 2px solid rgba(255,255,255,0.3);
-    border-radius: 6px;
+    border: 2px solid rgba(255,255,255,0.25);
+    border-radius: 8px;
     color: #8899bb;
+}
+.elev-controls.collapsed #elevViewToggle::before {
+    content: '\26F0';
+    font-size: 16px;
+    line-height: 1;
 }
 .elev-controls.collapsed #elevViewToggle:hover {
     background: #2a3a5e;
