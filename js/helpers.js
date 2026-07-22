@@ -1,5 +1,5 @@
 import { state } from './state.js';
-import { elSpeed, elSpeedUnit } from './dom.js';
+import { elSpeedUnit } from './dom.js';
 
 export function haversineKm(a, b) {
     const toRad = (deg) => (deg * Math.PI) / 180;
@@ -104,8 +104,7 @@ export function formatSpeed(kmh) {
 
 export function getSpeedKmh() {
     if (state.isPlaying) return state._currentSpeedKmh;
-    const val = parseFloat(elSpeed.value) || 0;
-    return elSpeedUnit.value === 'mph' ? val / 0.621371 : val;
+    return state._speedKmh;
 }
 
 export function lerp3(a, b, t) {

@@ -208,6 +208,7 @@ export function initStorage() {
                 chkPoiLabels: chkPoiLabels.checked,
                 chkFollow: chkFollow.checked,
                 chkTerrain: chkTerrain.checked,
+                chkUphill: chkTerrain.checked,
                 chk112: chk112.checked,
                 chkDrain: chkDrain.checked,
                 drainStart: drainGet('startH') + ':' + String(drainGet('startM')).padStart(2, '0'),
@@ -271,7 +272,9 @@ export function initStorage() {
                     }
                     if (s.chkPoi !== undefined) {
                         chkPoi.checked = s.chkPoi;
-                        if (!s.chkPoi) {
+                        if (s.chkPoi) {
+                            poiIcons.addTo(map);
+                        } else {
                             map.removeLayer(poiIcons);
                             map.removeLayer(poiLabels);
                         }
@@ -279,7 +282,9 @@ export function initStorage() {
                     if (s.chkPoiLabels !== undefined) {
                         chkPoiLabels.checked = s.chkPoiLabels;
                         chkPoiLabels.disabled = !chkPoi.checked;
-                        if (!s.chkPoiLabels || !chkPoi.checked) {
+                        if (s.chkPoiLabels && chkPoi.checked) {
+                            poiLabels.addTo(map);
+                        } else {
                             map.removeLayer(poiLabels);
                         }
                     }
@@ -317,6 +322,9 @@ export function initStorage() {
                     }
                     if (s.speed) {
                         elSpeed.value = s.speed;
+                        state._speedKmh = elSpeedUnit.value === 'mph'
+                            ? parseFloat(s.speed) / 0.621371
+                            : parseFloat(s.speed);
                     }
                     if (s.speedValue) {
                         document.getElementById('speedValue').value = s.speedValue;
@@ -342,6 +350,9 @@ export function initStorage() {
         }
         if (saved && saved.speed) {
             elSpeed.value = saved.speed;
+            state._speedKmh = elSpeedUnit.value === 'mph'
+                ? parseFloat(saved.speed) / 0.621371
+                : parseFloat(saved.speed);
         }
         if (saved && saved.speedValue) {
             document.getElementById('speedValue').value = saved.speedValue;
@@ -387,7 +398,9 @@ export function initStorage() {
         }
         if (saved && saved.chkPoi !== undefined) {
             chkPoi.checked = saved.chkPoi;
-            if (!saved.chkPoi) {
+            if (saved.chkPoi) {
+                poiIcons.addTo(map);
+            } else {
                 map.removeLayer(poiIcons);
                 map.removeLayer(poiLabels);
             }
@@ -395,7 +408,9 @@ export function initStorage() {
         if (saved && saved.chkPoiLabels !== undefined) {
             chkPoiLabels.checked = saved.chkPoiLabels;
             chkPoiLabels.disabled = !chkPoi.checked;
-            if (!saved.chkPoiLabels || !chkPoi.checked) {
+            if (saved.chkPoiLabels && chkPoi.checked) {
+                poiLabels.addTo(map);
+            } else {
                 map.removeLayer(poiLabels);
             }
         }

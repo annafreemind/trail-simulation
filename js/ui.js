@@ -36,6 +36,7 @@ function saveSettings() {
         chkPoiLabels: chkPoiLabels.checked,
         chkFollow: chkFollow.checked,
         chkTerrain: chkTerrain.checked,
+        chkUphill: chkTerrain.checked,
         chk112: chk112.checked,
         chkDrain: chkDrain.checked,
         drainStart: drainGet('startH') + ':' + String(drainGet('startM')).padStart(2, '0'),
@@ -50,6 +51,9 @@ function updateStartButton() {
     btnStart.disabled = state.waypoints.length < 2 || !parseFloat(elSpeed.value) || state.isPlaying;
     btnUndo.disabled = state.waypoints.length === 0 || state.isPlaying;
     btnClear.disabled = state.isPlaying;
+    document.querySelectorAll('.mode-btn').forEach(b => {
+        b.disabled = state.isPlaying;
+    });
 }
 
 function drawFallback() {
@@ -525,22 +529,19 @@ function drawElevProfile() {
 
 export function initUI() {
     elSpeed.addEventListener('input', () => {
+        const val = parseFloat(elSpeed.value) || 0;
+        state._speedKmh = speedUnit() === 'mph' ? val / 0.621371 : val;
         updateStartButton();
         if (!state.isPlaying) saveSettings();
     });
 
     elSpeedUnit.addEventListener('change', () => {
         const isMph = speedUnit() === 'mph';
-        const val = parseFloat(elSpeed.value);
-        if (val === 1.7 && isMph) elSpeed.value = '1.0';
-        else if (val === 1.0 && !isMph) elSpeed.value = '1.7';
-        else if (val) elSpeed.value = isMph ? (val * 0.621371).toFixed(1) : (val / 0.621371).toFixed(1);
+        elSpeed.value = isMph ? (state._speedKmh * 0.621371).toFixed(1) : state._speedKmh.toFixed(1);
 
         const sv = document.getElementById('speedValue');
         const svVal = parseFloat(sv.value);
-        if (svVal === 1.7 && isMph) sv.value = '1.0';
-        else if (svVal === 1.0 && !isMph) sv.value = '1.7';
-        else if (svVal) sv.value = isMph ? (svVal * 0.621371).toFixed(1) : (svVal / 0.621371).toFixed(1);
+        if (svVal) sv.value = isMph ? (svVal * 0.621371).toFixed(1) : (svVal / 0.621371).toFixed(1);
 
         infoCurrentSpeed.textContent = formatSpeed(getSpeedKmh());
         updateStartButton();
@@ -558,6 +559,8 @@ export function initUI() {
         state.customPoints.length = 0;
         state.routeElevationData.length = 0;
         state.elevationHistory.length = 0;
+        state.traveledDistanceKm = 0;
+        state.simElapsedSeconds = 0;
         state._lastRecordedMinute = -1;
         renderScheduledStops();
         renderSpeedPoints();
@@ -668,6 +671,9 @@ export function initUI() {
             btn.classList.add('active');
             document.getElementById('tab' + btn.dataset.tab.charAt(0).toUpperCase() + btn.dataset.tab.slice(1)).style.display = 'flex';
             btn3D.style.display = btn.dataset.tab === 'nav' ? '' : 'none';
+            if (btn.dataset.tab === 'route' && state.isPlaying) {
+                setStatus('Stop the simulation to edit the route', 'warning');
+            }
             if (btn.dataset.tab === 'route' && btn3D.classList.contains('active')) {
                 btn3D.classList.remove('active');
                 toggleMap3D();

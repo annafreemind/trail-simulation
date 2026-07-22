@@ -139,7 +139,7 @@ export function updateBatteryDrain() {
                     const pos = state.movingMarker.getLatLng();
                     const dot = L.circle(pos, {
                         radius: 10, color: 'transparent', weight: 0,
-                        fillColor: '#e91e63', fillOpacity: 0.35,
+                        fillColor: '#ff4081', fillOpacity: 0.5,
                         interactive: false, renderer: drainRenderer,
                     }).addTo(_mapRef);
                     state._drainStopDots.push(dot);
@@ -241,7 +241,7 @@ export function refreshDrainPath() {
         state.batteryDrainLine.setLatLngs(pts);
     } else {
         state.batteryDrainLine = L.polyline(pts, {
-            color: '#e91e63', weight: 10, opacity: 0.4,
+            color: '#ff4081', weight: 14, opacity: 0.6,
             interactive: false, renderer: drainRenderer,
         }).addTo(_mapRef);
     }

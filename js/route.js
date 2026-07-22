@@ -110,7 +110,7 @@ export function buildElevationData() {
             lat = state.waypoints[segIdx].lat + (state.waypoints[segIdx + 1].lat - state.waypoints[segIdx].lat) * t;
             lng = state.waypoints[segIdx].lng + (state.waypoints[segIdx + 1].lng - state.waypoints[segIdx].lng) * t;
         }
-        const ele = getElevationFromGrid(lat, lng);
+        const ele = typeof getElevationFromGrid === 'function' ? getElevationFromGrid(lat, lng) : null;
         if (ele !== null) data.push({ dist: d, ele: Math.round(ele) });
         d += stepKm;
         segPos += stepKm;

@@ -34,9 +34,9 @@
                 <button id="btnHelp" title="Help" style="width:26px;height:26px;background:transparent;border:1px solid #2a3a5e;border-radius:50%;color:#8899bb;font-size:14px;font-weight:700;cursor:pointer;flex-shrink:0;line-height:1">?</button>
             </h1>
 
-            <div style="display:flex;gap:4px;align-items:center;margin-bottom:6px">
-                <button class="tab-btn active" data-tab="route" style="flex:1">Route</button>
-                <button class="tab-btn" data-tab="nav" style="flex:1">Navigation</button>
+            <div class="tab-bar" style="margin-bottom:0">
+                <button class="tab-btn active" data-tab="route">Route</button>
+                <button class="tab-btn" data-tab="nav">Navigation</button>
             </div>
 
             <div style="display:flex;flex-direction:column;gap:8px">
@@ -64,7 +64,7 @@
                     <option value="osm">OpenStreetMap</option>
                     <option value="topo">OpenTopoMap</option>
                     <option value="satellite">Esri Satellite</option>
-                    <option value="wayback2014">ArcGIS 2014 year</option>
+                    <option value="wayback2014">ArcGIS Wayback 2014</option>
                 </select>
             </div>
             </div>
@@ -95,7 +95,7 @@
                 <div id="speedInputs" style="display:none;margin:4px 0;padding:4px;background:#0a1528;border-radius:4px">
                     <div style="display:flex;gap:4px;align-items:center;margin-bottom:3px">
                         <input type="text" id="speedLabel" placeholder="Label" style="flex:1;background:#0f1a30;border:1px solid #2a3a5e;border-radius:4px;padding:6px 8px;color:#f0f4ff;font-size:12px;outline:none" />
-                        <input type="number" id="speedValue" placeholder="Speed" value="1.7" min="0.1" step="0.1" style="width:70px;background:#0f1a30;border:1px solid #2a3a5e;border-radius:4px;padding:6px 8px;color:#f0f4ff;font-size:12px;outline:none" />
+                        <input type="number" id="speedValue" placeholder="Speed" value="3.4" min="0.1" step="0.1" style="width:70px;background:#0f1a30;border:1px solid #2a3a5e;border-radius:4px;padding:6px 8px;color:#f0f4ff;font-size:12px;outline:none" />
                     </div>
                     <div style="font-size:11px;color:#8899bb">Enter a label and speed, then click route to place a speed point</div>
                 </div>
@@ -149,7 +149,7 @@
                     </div>
                     <div class="ctrl-group">
                         <label for="speed">Base speed</label>
-                        <span style="display:inline-flex;align-items:center;gap:4px"><input type="number" id="speed" value="1.7" min="0.1" step="0.1" style="width:72px" /> <select id="speedUnit" style="background:#0f1a30;border:1px solid #2a3a5e;border-radius:4px;padding:7px 2px;color:#f0f4ff;font-size:12px;outline:none"><option value="kmh">km/h</option><option value="mph">mph</option></select></span>
+                        <span style="display:inline-flex;align-items:center;gap:4px"><input type="number" id="speed" value="3.4" min="0.1" step="0.1" style="width:72px" /> <select id="speedUnit" style="background:#0f1a30;border:1px solid #2a3a5e;border-radius:4px;padding:7px 2px;color:#f0f4ff;font-size:12px;outline:none"><option value="kmh">km/h</option><option value="mph">mph</option></select></span>
                     </div>
                 </div>
                 <div class="ctrl-group" style="margin:5px 0;gap:8px">

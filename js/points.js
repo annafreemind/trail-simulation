@@ -24,7 +24,7 @@ export function renderRoutePoints() {
             <span style="color:${color};flex-shrink:0">${passed ? '\u2713' : '\u25cf'}</span>
             <span style="text-decoration:${passed ? 'line-through' : 'none'};flex:1">${item.label}</span>
             ${detail ? `<span style="color:#8899bb;flex-shrink:0;font-size:11px">${detail}</span>` : ''}
-            <span class="del-route-point" data-type="${item.type}" data-index="${item.idx}" style="color:#e74c3c;cursor:pointer;font-size:14px;font-weight:700;line-height:1">\u00d7</span>
+            <span class="del-route-point" data-type="${item.type}" data-index="${item.idx}" style="color:#e74c3c;cursor:pointer;font-size:14px;font-weight:700;line-height:1;${state.isPlaying ? 'display:none' : ''}">\u00d7</span>
         </div>`;
     }).join('');
 }
@@ -152,6 +152,7 @@ export function hideAlarm() {
 
 export function initPoints() {
     routePointList.addEventListener('click', (e) => {
+        if (state.isPlaying) return;
         const del = e.target.closest('.del-route-point');
         if (!del) return;
         const type = del.dataset.type;

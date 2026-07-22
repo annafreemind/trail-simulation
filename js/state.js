@@ -10,6 +10,7 @@ export const state = {
     animationId: null,
     isPlaying: false,
     isPaused: false,
+    _speedKmh: 3.4,
     _currentSpeedKmh: 0,
     lastFrameTimestamp: 0,
     totalDistanceKm: 0,
@@ -71,5 +72,6 @@ export const state = {
     _map3dCustomLabels: [],
     _map3d112Labels: [],
     _map3dMouseDown: false,
+    _map3dMouseUpHandler: null,
     _alarmTimeouts: [],
 };

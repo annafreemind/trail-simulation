@@ -103,7 +103,8 @@ export function initMap3D() {
 
         const canvas = state.map3d.getCanvas();
         canvas.addEventListener('mousedown', () => { state._map3dMouseDown = true; });
-        document.addEventListener('mouseup', () => { state._map3dMouseDown = false; });
+        state._map3dMouseUpHandler = () => { state._map3dMouseDown = false; };
+        document.addEventListener('mouseup', state._map3dMouseUpHandler);
     });
 }
 
@@ -270,7 +271,7 @@ export function syncMap3dDrain() {
                 src.setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: coords } });
             } else {
                 state.map3d.addSource('drain-line', { type: 'geojson', data: { type: 'Feature', geometry: { type: 'LineString', coordinates: coords } } });
-                state.map3d.addLayer({ id: 'drain-line', type: 'line', source: 'drain-line', paint: { 'line-color': '#e91e63', 'line-width': 10, 'line-opacity': 0.4 } });
+                state.map3d.addLayer({ id: 'drain-line', type: 'line', source: 'drain-line', paint: { 'line-color': '#ff4081', 'line-width': 14, 'line-opacity': 0.6 } });
                 if (state.map3d.getLayer('route-line')) state.map3d.moveLayer('drain-line', 'route-line');
             }
         }
@@ -283,7 +284,7 @@ export function syncMap3dDrain() {
             src.setData({ type: 'FeatureCollection', features });
         } else {
             state.map3d.addSource('drain-dots', { type: 'geojson', data: { type: 'FeatureCollection', features } });
-            state.map3d.addLayer({ id: 'drain-dots', type: 'circle', source: 'drain-dots', paint: { 'circle-radius': 10, 'circle-color': '#e91e63', 'circle-opacity': 0.35 } }, 'route-line');
+            state.map3d.addLayer({ id: 'drain-dots', type: 'circle', source: 'drain-dots', paint: { 'circle-radius': 10, 'circle-color': '#ff4081', 'circle-opacity': 0.5 } }, 'route-line');
         }
     } else {
         if (state.map3d.getLayer('drain-dots')) state.map3d.removeLayer('drain-dots');
@@ -381,10 +382,10 @@ export function toggleMap3D() {
             const layerKey = document.getElementById('mapLayer').value;
             const layerMap = { osm: _layerRefs.osmLayer, topo: _layerRefs.topoLayer, satellite: _layerRefs.satelliteLayer, wayback2014: _layerRefs.wayback2014Layer };
             const newLayer = layerMap[layerKey];
-            if (newLayer && newLayer !== _layerRefs.currentLayer) {
-                if (_layerRefs.currentLayer) _mapRef.removeLayer(_layerRefs.currentLayer);
+            if (newLayer && newLayer !== state.currentLayer) {
+                if (state.currentLayer) _mapRef.removeLayer(state.currentLayer);
                 newLayer.addTo(_mapRef);
-                _layerRefs.currentLayer = newLayer;
+                state.currentLayer = newLayer;
             }
 
             _mapRef.setView([c.lat, c.lng], state.map3d.getZoom());
@@ -400,6 +401,10 @@ export function toggleMap3D() {
             state._map3dCustomLabels.length = 0;
             state._map3d112Labels.forEach(m => m.remove());
             state._map3d112Labels.length = 0;
+            if (state._map3dMouseUpHandler) {
+                document.removeEventListener('mouseup', state._map3dMouseUpHandler);
+                state._map3dMouseUpHandler = null;
+            }
             state.map3d.remove();
             state.map3d = null;
         }
