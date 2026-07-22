@@ -51,6 +51,7 @@ export function initMap3D() {
 
     const layerKey = document.getElementById('mapLayer').value;
     const tileUrl = TILE_URLS_3D[layerKey] || TILE_URLS_3D.osm;
+    const maxzoom = layerKey === 'topo' || layerKey === 'wayback2014' ? 17 : 19;
 
     state.map3d = new maplibregl.Map({
         container: 'map3d',
@@ -66,7 +67,7 @@ export function initMap3D() {
                     type: 'raster',
                     tiles: [tileUrl],
                     tileSize: 256,
-                    maxzoom: 19,
+                    maxzoom: maxzoom,
                 },
                 terrainSource: {
                     type: 'raster-dem',
@@ -104,6 +105,42 @@ export function initMap3D() {
         canvas.addEventListener('mousedown', () => { state._map3dMouseDown = true; });
         document.addEventListener('mouseup', () => { state._map3dMouseDown = false; });
     });
+}
+
+export function updateMap3dImagery(tileUrl, maxzoom) {
+    if (!state.map3d) return;
+
+    const src = state.map3d.getSource('imagery');
+    if (!src) return;
+
+    if (src.maxzoom === maxzoom) {
+        src.setTiles([tileUrl]);
+        return;
+    }
+
+    const center = state.map3d.getCenter();
+    const zoom = state.map3d.getZoom();
+    const bearing = state.map3d.getBearing();
+    const pitch = state.map3d.getPitch();
+
+    state.map3d.removeLayer('imagery');
+    state.map3d.removeSource('imagery');
+
+    state.map3d.addSource('imagery', {
+        type: 'raster',
+        tiles: [tileUrl],
+        tileSize: 256,
+        maxzoom: maxzoom,
+    });
+
+    const layers = state.map3d.getStyle().layers;
+    const firstId = layers.length > 0 ? layers[0].id : undefined;
+    state.map3d.addLayer({ id: 'imagery', type: 'raster', source: 'imagery' }, firstId);
+
+    state.map3d.setCenter(center);
+    state.map3d.setZoom(zoom);
+    state.map3d.setBearing(bearing);
+    state.map3d.setPitch(pitch);
 }
 
 function ensureCameraIcon() {

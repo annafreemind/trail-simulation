@@ -9,7 +9,7 @@ import {
     redrawPath, updateInfo, buildElevationData, setRouteMap,
 } from './route.js';
 import { renderScheduledStops, renderSpeedPoints, renderCustomPoints } from './points.js';
-import { initMap3D, toggleMap3D, syncMap3dStaticLayers, syncMap3dDrain } from './map3d.js';
+import { initMap3D, toggleMap3D, syncMap3dStaticLayers, syncMap3dDrain, updateMap3dImagery } from './map3d.js';
 import { TILE_URLS_3D as TILES3D } from './map3d.js';
 import { updateBatteryDrain } from './drain.js';
 import { drawElevProfile, updateStartButton } from './ui.js';
@@ -38,7 +38,8 @@ const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png
 }).addTo(map);
 
 const topoLayer = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
-    maxZoom: 17,
+    maxZoom: 19,
+    maxNativeZoom: 17,
     attribution: '&copy; <a href="https://opentopomap.org">OpenTopoMap</a> contributors',
 });
 topoLayer.on('tileerror', (e) => {
@@ -65,12 +66,10 @@ function onTileLayerChange() {
 
     if (is3DActive) {
         const tileUrl = TILES3D[this.value] || TILES3D.osm;
-        const src = state.map3d.getSource('imagery');
-        if (src) {
-            src.setTiles([tileUrl]);
-            syncMap3dStaticLayers();
-            syncMap3dDrain();
-        }
+        const maxzoom = (this.value === 'topo' || this.value === 'wayback2014') ? 17 : 19;
+        updateMap3dImagery(tileUrl, maxzoom);
+        syncMap3dStaticLayers();
+        syncMap3dDrain();
     } else {
         const layerMap = { osm: osmLayer, topo: topoLayer, satellite: satelliteLayer, wayback2014: wayback2014Layer };
         const newLayer = layerMap[this.value];

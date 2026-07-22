@@ -263,7 +263,7 @@ export function animationLoop(timestamp) {
     state.movingMarker.setLatLng(pos);
     updateMap3dMarker(pos);
     if (state.followMode) _mapRef.panTo(pos, { animate: false });
-    if (state.followMode && state.map3d && !state._map3dMouseDown) {
+    if (state.followMode && state.map3d && !state._map3dMouseDown && !state.map3d.isMoving()) {
         state.map3d.jumpTo({
             center: [pos.lng, pos.lat],
             bearing: state.map3d.getBearing(),
