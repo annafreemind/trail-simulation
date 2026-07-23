@@ -51,12 +51,12 @@ export function initMap3D() {
 
     const layerKey = document.getElementById('mapLayer').value;
     const tileUrl = TILE_URLS_3D[layerKey] || TILE_URLS_3D.osm;
-    const maxzoom = layerKey === 'topo' || layerKey === 'wayback2014' ? 17 : 19;
+    const maxzoom = layerKey === 'osm' ? 19 : layerKey === 'topo' ? 17 : 18;
 
     state.map3d = new maplibregl.Map({
         container: 'map3d',
         center: [_mapRef.getCenter().lng, _mapRef.getCenter().lat],
-        zoom: Math.min(_mapRef.getZoom(), 15),
+        zoom: Math.min(_mapRef.getZoom(), 20),
         pitch: 60,
         maxPitch: 85,
         localFontFamily: 'Arial, sans-serif',
@@ -374,7 +374,7 @@ export function toggleMap3D() {
         map3dEl.style.display = 'block';
         initMap3D();
         state.map3d.resize();
-        state.map3d.jumpTo({ center: [_mapRef.getCenter().lng, _mapRef.getCenter().lat], zoom: Math.min(_mapRef.getZoom(), 15) });
+        state.map3d.jumpTo({ center: [_mapRef.getCenter().lng, _mapRef.getCenter().lat], zoom: Math.min(_mapRef.getZoom(), 20) });
     } else {
         if (state.map3d) {
             const c = state.map3d.getCenter();

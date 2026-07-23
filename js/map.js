@@ -69,7 +69,7 @@ function onTileLayerChange() {
 
     if (is3DActive) {
         const tileUrl = TILES3D[this.value] || TILES3D.osm;
-        const maxzoom = (this.value === 'topo' || this.value === 'wayback2014') ? 17 : 19;
+        const maxzoom = (this.value === 'osm') ? 19 : (this.value === 'topo') ? 17 : 18;
         updateMap3dImagery(tileUrl, maxzoom);
         syncMap3dStaticLayers();
         syncMap3dDrain();
