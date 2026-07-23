@@ -14,6 +14,9 @@ import { TILE_URLS_3D as TILES3D } from './map3d.js';
 import { updateBatteryDrain } from './drain.js';
 import { drawElevProfile, updateStartButton } from './ui.js';
 
+let _saveSettingsFn = null;
+export function setMapSaveSettingsRef(fn) { _saveSettingsFn = fn; }
+
 const map = L.map('map', {
     center: [8.836955, -82.423918],
     zoom: 17,
@@ -80,8 +83,9 @@ function onTileLayerChange() {
             map.removeLayer(state.currentLayer);
             newLayer.addTo(map);
             state.currentLayer = newLayer;
-        }
     }
+    if (_saveSettingsFn) _saveSettingsFn();
+}
 }
 
 function setStatus(msg, type) {
@@ -89,7 +93,7 @@ function setStatus(msg, type) {
     statusBar.className = type ? type : '';
 }
 
-function onMapClick(e) {
+export function onMapClick(e) {
     if (state.isPlaying) return;
     if (state.isAddingStops) {
         if (state.waypoints.length < 2) { setStatus('Draw a route first', 'error'); return; }

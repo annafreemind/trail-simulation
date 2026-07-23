@@ -21,7 +21,7 @@ import {
 } from './drain.js';
 import { getStartDateTime, stopAnimation, updateCurrentTime, updateStartTime } from './animation.js';
 import { setStatus } from './map.js';
-import { updateMap3dPoiVisibility, toggleMap3D, syncMap3dDrain } from './map3d.js';
+import { updateMap3dPoiVisibility, syncMap3dDrain } from './map3d.js';
 import { map, poiIcons, poiLabels } from './map.js';
 
 function saveSettings() {
@@ -582,6 +582,10 @@ export function initUI() {
         if (state.waypoints.length < 2 && state.polyline) {
             map.removeLayer(state.polyline);
             state.polyline = null;
+            state.scheduledStops.length = 0;
+            state.speedPoints.length = 0;
+            renderScheduledStops();
+            renderSpeedPoints();
         }
         redrawPath();
         updateInfo();
@@ -592,15 +596,37 @@ export function initUI() {
         } else {
             const totalDist = pathLength(state.waypoints);
             state.routeElevationData = state.routeElevationData.filter(d => d.dist <= totalDist + 0.0001);
+            const removedStops = state.scheduledStops.filter(s => s.routeDist > totalDist + 0.0001);
+            const removedSpeeds = state.speedPoints.filter(s => s.routeDist > totalDist + 0.0001);
+            if (removedStops.length || removedSpeeds.length) {
+                state.scheduledStops = state.scheduledStops.filter(s => s.routeDist <= totalDist + 0.0001);
+                state.speedPoints = state.speedPoints.filter(s => s.routeDist <= totalDist + 0.0001);
+                renderScheduledStops();
+                renderSpeedPoints();
+                setStatus(`Last point removed. Also removed ${removedStops.length + removedSpeeds.length} speed/stop point(s) past the route end`, '');
+            }
         }
         drawElevProfile();
     });
 
     btnFit.addEventListener('click', () => {
-        if (state.waypoints.length >= 2) {
-            map.fitBounds(L.latLngBounds(state.waypoints), { padding: [50, 50] });
+        if (state.map3d) {
+            if (state.waypoints.length >= 2) {
+                const lngs = state.waypoints.map(p => p.lng);
+                const lats = state.waypoints.map(p => p.lat);
+                state.map3d.fitBounds(
+                    [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
+                    { padding: 50, maxZoom: 18 }
+                );
+            } else {
+                state.map3d.flyTo({ center: [state.CENTER[1], state.CENTER[0]], zoom: state.ZOOM });
+            }
         } else {
-            map.setView(state.CENTER, state.ZOOM);
+            if (state.waypoints.length >= 2) {
+                map.fitBounds(L.latLngBounds(state.waypoints), { padding: [50, 50] });
+            } else {
+                map.setView(state.CENTER, state.ZOOM);
+            }
         }
     });
 
@@ -670,17 +696,9 @@ export function initUI() {
             document.querySelectorAll('.tab-content').forEach(t => t.style.display = 'none');
             btn.classList.add('active');
             document.getElementById('tab' + btn.dataset.tab.charAt(0).toUpperCase() + btn.dataset.tab.slice(1)).style.display = 'flex';
-            btn3D.style.display = btn.dataset.tab === 'nav' ? '' : 'none';
+            btn3D.style.display = '';
             if (btn.dataset.tab === 'route' && state.isPlaying) {
                 setStatus('Stop the simulation to edit the route', 'warning');
-            }
-            if (btn.dataset.tab === 'route' && btn3D.classList.contains('active')) {
-                btn3D.classList.remove('active');
-                toggleMap3D();
-            }
-            if (btn.dataset.tab === 'nav' && localStorage.getItem('trail_3d_active') === 'true' && !btn3D.classList.contains('active')) {
-                btn3D.classList.add('active');
-                toggleMap3D();
             }
         });
     });

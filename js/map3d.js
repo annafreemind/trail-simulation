@@ -1,5 +1,5 @@
 import { state } from './state.js';
-
+import { onMapClick } from './map.js';
 import { mapEl, map3dEl, btn3D, chkLabels, chkPoi, chkPoiLabels } from './dom.js';
 import { formatStopDuration, formatSpeed } from './helpers.js';
 
@@ -105,6 +105,10 @@ export function initMap3D() {
         canvas.addEventListener('mousedown', () => { state._map3dMouseDown = true; });
         state._map3dMouseUpHandler = () => { state._map3dMouseDown = false; };
         document.addEventListener('mouseup', state._map3dMouseUpHandler);
+
+        state.map3d.on('click', (e) => {
+            onMapClick({ latlng: L.latLng(e.lngLat.lat, e.lngLat.lng) });
+        });
     });
 }
 
@@ -156,30 +160,30 @@ export function syncMap3dRoute() {
     if (state.waypoints.length < 2) {
         if (state.map3d.getLayer('route-line')) state.map3d.removeLayer('route-line');
         if (state.map3d.getSource('route')) state.map3d.removeSource('route');
-        if (state.map3d.getLayer('route-start')) state.map3d.removeLayer('route-start');
-        if (state.map3d.getSource('route-start')) state.map3d.removeSource('route-start');
-        if (state.map3d.getLayer('route-end')) state.map3d.removeLayer('route-end');
-        if (state.map3d.getSource('route-end')) state.map3d.removeSource('route-end');
+    }
+
+    if (state.waypoints.length === 0) {
         if (state.map3d.getLayer('waypoints')) state.map3d.removeLayer('waypoints');
         if (state.map3d.getSource('waypoints')) state.map3d.removeSource('waypoints');
         return;
     }
 
-    const coords = state.waypoints.map(p => [p.lng, p.lat]);
-    _map3dUpsert('route-start', { type: 'Point', coordinates: coords[0] });
-    _map3dLayer('route-start', 'circle', 'route-start', { 'circle-radius': 6, 'circle-color': '#27ae60' });
-    _map3dUpsert('route-end', { type: 'Point', coordinates: coords[coords.length - 1] });
-    _map3dLayer('route-end', 'circle', 'route-end', { 'circle-radius': 6, 'circle-color': '#e74c3c' });
-    _map3dUpsert('route', { type: 'Feature', geometry: { type: 'LineString', coordinates: coords } });
-    _map3dLayer('route-line', 'line', 'route', { 'line-color': '#4a7cf7', 'line-width': 4 });
     _map3dUpsert('waypoints', { type: 'FeatureCollection', features: state.waypoints.map(p => ({ type: 'Feature', geometry: { type: 'Point', coordinates: [p.lng, p.lat] } })) });
-    _map3dLayer('waypoints', 'circle', 'waypoints', { 'circle-radius': 3, 'circle-color': '#4a7cf7', 'circle-stroke-width': 2, 'circle-stroke-color': '#fff' });
+    _map3dLayer('waypoints', 'circle', 'waypoints', { 'circle-radius': 4, 'circle-color': '#4a7cf7', 'circle-stroke-width': 2, 'circle-stroke-color': '#fff' });
+    if (state.map3d.getLayer('waypoints')) state.map3d.moveLayer('waypoints');
+
+    if (state.waypoints.length >= 2) {
+        const coords = state.waypoints.map(p => [p.lng, p.lat]);
+        _map3dUpsert('route', { type: 'Feature', geometry: { type: 'LineString', coordinates: coords } });
+        _map3dLayer('route-line', 'line', 'route', { 'line-color': '#4a7cf7', 'line-width': 4 });
+    }
 }
 
 export function syncMap3dStops() {
     if (!state.map3d) return;
     _map3dUpsert('stops', { type: 'FeatureCollection', features: state.scheduledStops.map(s => ({ type: 'Feature', geometry: { type: 'Point', coordinates: [s.latlng.lng, s.latlng.lat] } })) });
-    _map3dLayer('stops', 'circle', 'stops', { 'circle-radius': 4, 'circle-color': '#f39c12', 'circle-stroke-width': 2, 'circle-stroke-color': '#fff' });
+    _map3dLayer('stops', 'circle', 'stops', { 'circle-radius': 6, 'circle-color': '#f39c12', 'circle-stroke-width': 3, 'circle-stroke-color': '#fff' });
+    if (state.map3d.getLayer('stops')) state.map3d.moveLayer('stops');
     state._map3dStopLabels.forEach(m => m.remove());
     state._map3dStopLabels.length = 0;
     if (chkLabels.checked) {
@@ -196,7 +200,8 @@ export function syncMap3dStops() {
 export function syncMap3dSpeeds() {
     if (!state.map3d) return;
     _map3dUpsert('speeds', { type: 'FeatureCollection', features: state.speedPoints.map(s => ({ type: 'Feature', geometry: { type: 'Point', coordinates: [s.latlng.lng, s.latlng.lat] } })) });
-    _map3dLayer('speeds', 'circle', 'speeds', { 'circle-radius': 4, 'circle-color': '#2ecc71', 'circle-stroke-width': 2, 'circle-stroke-color': '#fff' });
+    _map3dLayer('speeds', 'circle', 'speeds', { 'circle-radius': 6, 'circle-color': '#2ecc71', 'circle-stroke-width': 3, 'circle-stroke-color': '#fff' });
+    if (state.map3d.getLayer('speeds')) state.map3d.moveLayer('speeds');
     state._map3dSpeedLabels.forEach(m => m.remove());
     state._map3dSpeedLabels.length = 0;
     if (chkLabels.checked) {
@@ -213,7 +218,8 @@ export function syncMap3dSpeeds() {
 export function syncMap3dCustoms() {
     if (!state.map3d) return;
     _map3dUpsert('customs', { type: 'FeatureCollection', features: state.customPoints.map(s => ({ type: 'Feature', geometry: { type: 'Point', coordinates: [s.latlng.lng, s.latlng.lat] } })) });
-    _map3dLayer('customs', 'circle', 'customs', { 'circle-radius': 4, 'circle-color': '#9b59b6', 'circle-stroke-width': 2, 'circle-stroke-color': '#fff' });
+    _map3dLayer('customs', 'circle', 'customs', { 'circle-radius': 6, 'circle-color': '#9b59b6', 'circle-stroke-width': 3, 'circle-stroke-color': '#fff' });
+    if (state.map3d.getLayer('customs')) state.map3d.moveLayer('customs');
     state._map3dCustomLabels.forEach(m => m.remove());
     state._map3dCustomLabels.length = 0;
     if (chkLabels.checked) {
@@ -233,12 +239,14 @@ function _syncMap3dPhotosData() {
     if (!state.map3d.hasImage('camera-icon')) return;
     _map3dUpsert('poi-photos', { type: 'FeatureCollection', features: PHOTOS.map(p => ({ type: 'Feature', properties: { photo: p.photo, time: p.time, desc: p.desc }, geometry: { type: 'Point', coordinates: [p.lng, p.lat] } })) });
     _map3dLayer('poi-photos', 'symbol', 'poi-photos', null, { 'icon-image': 'camera-icon', 'icon-size': 1.2, 'icon-anchor': 'bottom' });
+    if (state.map3d.getLayer('poi-photos')) state.map3d.moveLayer('poi-photos');
 }
 
 function _syncMap3dPoisData() {
     if (!state.map3d || typeof POIS === 'undefined' || POIS.length === 0) return;
     _map3dUpsert('poi-points', { type: 'FeatureCollection', features: POIS.map(p => ({ type: 'Feature', properties: { label: p.name }, geometry: { type: 'Point', coordinates: [p.lng, p.lat] } })) });
     _map3dLayer('poi-points', 'circle', 'poi-points', { 'circle-radius': 14, 'circle-color': 'transparent', 'circle-stroke-width': 2, 'circle-stroke-color': '#e74c3c' });
+    if (state.map3d.getLayer('poi-points')) state.map3d.moveLayer('poi-points');
 }
 
 export function syncMap3dStaticLayers() {
@@ -304,6 +312,7 @@ export function syncMap3d112() {
 
     _map3dUpsert('112-markers', { type: 'FeatureCollection', features: state._112Points.map(p => ({ type: 'Feature', geometry: { type: 'Point', coordinates: [p.latlng.lng, p.latlng.lat] } })) });
     _map3dLayer('112-markers', 'circle', '112-markers', { 'circle-radius': 4, 'circle-color': '#e74c3c', 'circle-stroke-width': 2, 'circle-stroke-color': '#fff' });
+    if (state.map3d.getLayer('112-markers')) state.map3d.moveLayer('112-markers');
     if (chkLabels.checked) {
         state._112Points.forEach(p => {
             const el = document.createElement('div');
@@ -352,6 +361,7 @@ export function addMap3dMarker() {
     _map3dUpsert('move-marker', { type: 'Point', coordinates: pos });
     _map3dLayer('move-marker-layer', 'circle', 'move-marker', {
         'circle-radius': 8, 'circle-color': '#e74c3c', 'circle-stroke-width': 2, 'circle-stroke-color': '#fff' });
+    if (state.map3d.getLayer('move-marker-layer')) state.map3d.moveLayer('move-marker-layer');
 }
 
 export function updateMap3dMarker(latlng) {

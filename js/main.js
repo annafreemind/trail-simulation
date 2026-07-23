@@ -1,7 +1,7 @@
-import { initMap, setStatus, osmLayer, topoLayer, satelliteLayer, wayback2014Layer, poiIcons, poiLabels, map } from './map.js';
-import { setMap3dMapRef, setMap3dLayerRefs, setSaveSettingsRef as setMap3dSaveRef } from './map3d.js';
+import { initMap, setStatus, setMapSaveSettingsRef, osmLayer, topoLayer, satelliteLayer, wayback2014Layer, poiIcons, poiLabels, map } from './map.js';
+import { setMap3dMapRef, setMap3dLayerRefs, setSaveSettingsRef as setMap3dSaveRef, toggleMap3D } from './map3d.js';
 import { state } from './state.js';
-import { chkLabels, chkPoi, chkPoiLabels, btnStart, btnPause, btnStop, elSpeed, elSpeedUnit, infoCurrentSpeed } from './dom.js';
+import { chkLabels, chkPoi, chkPoiLabels, btnStart, btnPause, btnStop, btn3D, elSpeed, elSpeedUnit, infoCurrentSpeed } from './dom.js';
 import { initDrain, setDrainMap, setSaveSettingsRef as setDrainSaveRef, setDrainVisibility } from './drain.js';
 import { setAnimMap, startAnimation, stopAnimation, animationLoop, getStartDateTime, updateCurrentTime, updateStartTime, setUpdateStartButton, setDrawElevProfile, setDrawSunView } from './animation.js';
 import { initUI, saveSettings, updateStartButton, drawElevProfile, refreshSunView } from './ui.js';
@@ -14,12 +14,19 @@ setMap3dLayerRefs({ osmLayer, topoLayer, satelliteLayer, wayback2014Layer, curre
 setMap3dSaveRef(saveSettings);
 setDrainMap(map);
 setDrainSaveRef(saveSettings);
+setMapSaveSettingsRef(saveSettings);
 setAnimMap(map);
 setUpdateStartButton(updateStartButton);
 setDrawElevProfile(drawElevProfile);
 setDrawSunView(refreshSunView);
 
 initMap();
+
+if (localStorage.getItem('trail_3d_active') === 'true') {
+    btn3D.classList.add('active');
+    toggleMap3D();
+}
+
 setPointsMap(map);
 initPoints();
 

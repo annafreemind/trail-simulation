@@ -339,6 +339,7 @@ input:disabled, select:disabled {
     flex-direction: row-reverse;
     align-items: flex-end;
     gap: 6px;
+    pointer-events: none;
 }
 
 #sunView {
@@ -390,6 +391,7 @@ input:disabled, select:disabled {
     border-radius: 0 0 6px 6px;
     min-height: 38px;
     gap: 6px;
+    pointer-events: auto;
 }
 .sun-info {
     color: #fff;
