@@ -17,6 +17,7 @@ import { drawElevProfile, updateStartButton } from './ui.js';
 const map = L.map('map', {
     center: [8.836955, -82.423918],
     zoom: 17,
+    maxZoom: 22,
     zoomControl: true,
 });
 
@@ -50,13 +51,13 @@ topoLayer.on('tileerror', (e) => {
 });
 
 const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-    maxZoom: 19,
-    maxNativeZoom: 18,
+    maxZoom: 22,
+    maxNativeZoom: 17,
     attribution: '&copy; Esri, Maxar, Earthstar Geographics, and the GIS User Community',
 });
 
 const wayback2014Layer = L.tileLayer('https://wayback.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/WMTS/1.0.0/default028mm/MapServer/tile/10/{z}/{y}/{x}', {
-    maxZoom: 19,
+    maxZoom: 22,
     maxNativeZoom: 17,
     attribution: '&copy; Esri, ArcGIS, World Imagery Wayback 2014',
 });
