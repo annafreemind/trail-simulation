@@ -8,6 +8,7 @@ import { initUI, saveSettings, updateStartButton, drawElevProfile, refreshSunVie
 import { initStorage } from './storage.js';
 import { setPointsMap, initPoints } from './points.js';
 import { formatSpeed, getSpeedKmh } from './helpers.js';
+import { setDroneMap, fetchDroneData, loadDroneRoutes, syncMap3dDrone } from './drone-routes.js';
 
 setMap3dMapRef(map);
 setMap3dLayerRefs({ osmLayer, topoLayer, satelliteLayer, wayback2014Layer, currentLayer: state.currentLayer });
@@ -22,17 +23,25 @@ setDrawSunView(refreshSunView);
 
 initMap();
 
-if (localStorage.getItem('trail_3d_active') === 'true') {
-    btn3D.classList.add('active');
-    toggleMap3D();
-}
-
 setPointsMap(map);
 initPoints();
 
 initUI();
 initDrain();
 initStorage();
+
+if (localStorage.getItem('trail_3d_active') === 'true') {
+    btn3D.classList.add('active');
+    toggleMap3D();
+}
+
+setDroneMap(map);
+fetchDroneData().then(() => {
+    if (document.getElementById('chkDrone').checked) {
+        loadDroneRoutes();
+        syncMap3dDrone();
+    }
+});
 
 btnStart.addEventListener('click', startAnimation);
 

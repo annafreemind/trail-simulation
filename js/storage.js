@@ -1,7 +1,7 @@
 import { state } from './state.js';
 import {
     elStartTime, elSpeed, elSpeedUnit, elTimeScale, elTimeScaleLabel,
-    chkFollow, chkLabels, chkPoi, chkPoiLabels, chkTerrain, chk112, chkDrain,
+    chkFollow, chkLabels, chkPoi, chkPoiLabels, chkTerrain, chk112, chkDrain, chkDrone,
 } from './dom.js';
 import {
     redrawPath, updateInfo, buildElevationData,
@@ -211,6 +211,7 @@ export function initStorage() {
                 chkUphill: chkTerrain.checked,
                 chk112: chk112.checked,
                 chkDrain: chkDrain.checked,
+                chkDrone: chkDrone.checked,
                 drainStart: drainGet('startH') + ':' + String(drainGet('startM')).padStart(2, '0'),
                 drainEnd: drainGet('endH') + ':' + String(drainGet('endM')).padStart(2, '0'),
                 timeScale: elTimeScale.value,
@@ -305,6 +306,9 @@ export function initStorage() {
                         chkDrain.checked = s.chkDrain;
                         setDrainVisibility(s.chkDrain);
                     }
+                    if (s.chkDrone !== undefined) {
+                        chkDrone.checked = s.chkDrone;
+                    }
                     if (s.drainStart) {
                         const [h, m] = s.drainStart.split(':');
                         drainSet('startH', parseInt(h)); drainSet('startM', parseInt(m));
@@ -376,6 +380,9 @@ export function initStorage() {
         if (saved && saved.chkDrain !== undefined) {
             chkDrain.checked = saved.chkDrain;
             setDrainVisibility(saved.chkDrain);
+        }
+        if (saved && saved.chkDrone !== undefined) {
+            chkDrone.checked = saved.chkDrone;
         }
         if (saved && saved.drainStart) {
             const [h, m] = saved.drainStart.split(':');

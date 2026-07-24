@@ -2,6 +2,7 @@ import { state } from './state.js';
 import { onMapClick } from './map.js';
 import { mapEl, map3dEl, btn3D, chkLabels, chkPoi, chkPoiLabels } from './dom.js';
 import { formatStopDuration, formatSpeed } from './helpers.js';
+import { syncMap3dDrone, removeMap3dDrone } from './drone-routes.js';
 
 export const TILE_URLS_3D = {
     osm: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
@@ -58,7 +59,7 @@ export function initMap3D() {
         center: [_mapRef.getCenter().lng, _mapRef.getCenter().lat],
         zoom: Math.min(_mapRef.getZoom(), 20),
         pitch: 60,
-        maxPitch: 85,
+        maxPitch: 75,
         localFontFamily: 'Arial, sans-serif',
         style: {
             version: 8,
@@ -95,6 +96,7 @@ export function initMap3D() {
 
         syncMap3dStaticLayers();
         syncMap3dDrain();
+        syncMap3dDrone();
         updateMap3dPoiVisibility();
         if (state.isPlaying && state.movingMarker) {
             addMap3dMarker();
@@ -411,6 +413,7 @@ export function toggleMap3D() {
             state._map3dCustomLabels.length = 0;
             state._map3d112Labels.forEach(m => m.remove());
             state._map3d112Labels.length = 0;
+            removeMap3dDrone();
             if (state._map3dMouseUpHandler) {
                 document.removeEventListener('mouseup', state._map3dMouseUpHandler);
                 state._map3dMouseUpHandler = null;
@@ -424,3 +427,5 @@ export function toggleMap3D() {
     }
     if (_saveSettingsFn) _saveSettingsFn();
 }
+
+export { syncMap3dDrone, removeMap3dDrone };

@@ -3,7 +3,7 @@ import {
     elStartTime, elSpeed, elSpeedUnit, elTimeScale, elTimeScaleLabel,
     btnStart, btnPause, btnStop, btnClear, btnUndo, btnFit,
     infoCurrentSpeed, infoTimer,
-    chkFollow, chkLabels, chkPoi, chkPoiLabels, chkTerrain, chk112, chkDrain,
+    chkFollow, chkLabels, chkPoi, chkPoiLabels,     chkTerrain, chk112, chkDrain, chkDrone,
     btn3D,
     sunCanvas, sunCtx, elevCanvas, elevCtx,
 } from './dom.js';
@@ -21,8 +21,9 @@ import {
 } from './drain.js';
 import { getStartDateTime, stopAnimation, updateCurrentTime, updateStartTime } from './animation.js';
 import { setStatus } from './map.js';
-import { updateMap3dPoiVisibility, syncMap3dDrain } from './map3d.js';
+import { updateMap3dPoiVisibility, toggleMap3D, syncMap3dDrain, syncMap3dDrone, removeMap3dDrone } from './map3d.js';
 import { map, poiIcons, poiLabels } from './map.js';
+import { toggleDroneRoutes } from './drone-routes.js';
 
 function saveSettings() {
     localStorage.setItem('trail_settings', JSON.stringify({
@@ -39,6 +40,7 @@ function saveSettings() {
         chkUphill: chkTerrain.checked,
         chk112: chk112.checked,
         chkDrain: chkDrain.checked,
+        chkDrone: chkDrone.checked,
         drainStart: drainGet('startH') + ':' + String(drainGet('startM')).padStart(2, '0'),
         drainEnd: drainGet('endH') + ':' + String(drainGet('endM')).padStart(2, '0'),
         timeScale: elTimeScale.value,
@@ -677,6 +679,12 @@ export function initUI() {
         setDrainVisibility(chkDrain.checked && !state.isPlaying);
         updateBatteryDrain();
         syncMap3dDrain();
+        saveSettings();
+    });
+
+    chkDrone.addEventListener('change', () => {
+        toggleDroneRoutes();
+        syncMap3dDrone();
         saveSettings();
     });
 

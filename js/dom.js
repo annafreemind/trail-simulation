@@ -22,6 +22,7 @@ export const chkPoiLabels = document.getElementById('chkPoiLabels');
 export const chkTerrain = document.getElementById('chkTerrain');
 export const chk112 = document.getElementById('chk112');
 export const chkDrain = document.getElementById('chkDrain');
+export const chkDrone = document.getElementById('chkDrone');
 export const btn3D = document.getElementById('btn3D');
 
 export const sunCanvas = document.getElementById('sunView');

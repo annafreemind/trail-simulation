@@ -83,9 +83,9 @@ function onTileLayerChange() {
             map.removeLayer(state.currentLayer);
             newLayer.addTo(map);
             state.currentLayer = newLayer;
+        }
     }
     if (_saveSettingsFn) _saveSettingsFn();
-}
 }
 
 function setStatus(msg, type) {
